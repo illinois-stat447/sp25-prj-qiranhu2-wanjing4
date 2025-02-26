@@ -46,7 +46,7 @@ server = function(input, output, session) {
     filtered_data(table_data)
   })
   
-  # Initial load (show all data)
+  # Show all data
   observe({
     con = dbConnect(SQLite(), "my_database.db")
     table_data = dbGetQuery(con, "SELECT * FROM my_table")
