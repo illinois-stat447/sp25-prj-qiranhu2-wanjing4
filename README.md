@@ -1,6 +1,6 @@
-A line I wrote on my local computer 
+A line I wrote on my local computer
 
-# Airbnb Analysis and Prediction Website Application
+# Covid-19 Analysis Website Application
 
 ## Authors
 
@@ -9,7 +9,7 @@ Zoey Yao ([wanjing4\@illinois.edu](mailto:wanjing4@illinois.edu))
 
 ## Project Proposal
 
-This project aims to develop a Shiny website application that integrates with the Yelp Fusion Market API to analyze restaurant and market data, generate interactive visualizations, and develop predictive models. The application will provide valuable insights for restaurant owners, customers, and analysts by processing Yelp Fusion data to understand market trends, optimize pricing strategies, and predict future demand.
+This project aims to develop a Shiny website application that integrates with the Covid Data API to analyze trend covid cases/deaths overtime. Interactive visualizations and time series analysis will be implemented. The application will provide valuable insights for researchers, policymakers, researchers, and the general public, enabling them to better understand the progression of the pandemic and prepare more effectively for future global health crises. By analyzing trends, identifying patterns, and comparing the impact across different regions, the application will support data-driven decision-making and improve readiness for potential outbreaks.
 
 ## Data
 
@@ -17,51 +17,48 @@ Through the Yelp Fusion Market API, we can obtain the most updated data from the
 
 ## Key Dimensions
 
--   Popularity/ratings - popularity of the restaurant
+-   Cases - number of covid cases each day, cumulative
 
--   Cuisine categories and other features of the restaurant
+-   Deaths - number of people died because of positive covid test
 
 ## Research Question
 
 The project will also answer the questions below
 
-1.  What are the commonalities of the restaurants that have high ratings? (If someone wants to start a new restaurant, he can refer to these traits.)
+1.  How have COVID-19 cases and deaths evolved over time in different countries and states?
 
-2.  Is there a rating difference between each cuisine?
+2.  Are there seasonal patterns or periodic spikes in COVID-19 cases and deaths?
 
-3.  If we need to register a newly opened restaurant, with all other secondary attributes/features, what might be its rating?
+3.  Which countries or states had the highest and lowest death rates relative to their population over time?
 
-4.  If we need to register a newly opened restaurant, with all other secondary attributes/features, what might be its rating?
+4.  What are the early warning indicators that signal a potential surge in COVID-19 cases?
+
+5.  How do COVID-19 trends compare between high-income and low-income countries? (if income api is found)
+
+6.  Did government interventions (e.g., lockdowns, mask mandates, vaccination rollouts) correlate with changes in COVID-19 cases and deaths?
+
+7.  What lessons can be learned from COVID-19 data to improve preparedness for future global pandemics?
 
 ## Methodology
 
 ### Data Preprocessing
 
 -   Data will be scraped from the web API using SQL.
--   PCA and correlation matrices will be used to reduce the high dimensionality of the dataset.
--   Continuous variables will be discretized if the performance of the final model is low.
 
-### Prediction Analysis
+### Time Analysis
 
--   Linear regression models will estimate the impact of price changes on sales.
--   Random Forest and Logistic Regression models will classify customers based on retention likelihood.
--   The final model will be selected based on the best performance, and evaluated using R\^2 and RMSE.
+-   Research needed
+-   
+-   
 
 ### Visualization
 
--   Sales trends will be analyzed through different data visualizations.
--   A correlation heatmap will be used to examine relationships between pricing, sales, and ratings.
--   The most popular restaurant categories will be identified through bar charts.
+-   Case/death trends will be analyzed through different data visualizations.
 -   Visualizations of attribute summaries will be created using box plots, bar charts, and histograms.
--   K-means clustering will be employed to find common traits among popular restaurants.
 -   Visualizations will be created using ggplot2
+-   More to add
 
 ## Main Features of the Application
 
--   **Interactive Visualizations** for sales trends, rating distributions, and cuisine popularity.
--   **Recommendation System** based on user preferences (cuisine, price range, and location).
--   **Predictive Analytics** to estimate the impact of pricing on sales and classify customer retention likelihood.
--   **Market Insights** through clustering and PCA analysis to determine key success factors for restaurants.
-
-By combining advanced analytics with an intuitive user interface, this Shiny application will serve as a valuable tool for business owners, market analysts, and food enthusiasts looking to make data-driven decisions in the restaurant industry.
-
+-   **Interactive Visualizations** for covid trends in different countries.
+-   **More to add**
