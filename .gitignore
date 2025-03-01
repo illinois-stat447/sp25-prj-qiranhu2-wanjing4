@@ -1,2 +1,4 @@
 .Rproj.user
-my_database.db.DS_Store
+my_database.db
+.DS_Store
+
