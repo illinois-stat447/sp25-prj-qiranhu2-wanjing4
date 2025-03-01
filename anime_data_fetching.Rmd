@@ -8,22 +8,76 @@ date: "2025-03-01"
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+## Connect to Data base
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+```{r}
+library(httr)
+library(jsonlite)
+library(DBI)
+library(RSQLite)
+conn <- dbConnect(SQLite(), "anime_database.sqlite")
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
 ```
 
-## Including Plots
+## fetch Data
 
-You can also embed plots, for example:
+```{r}
+# Fetch multiple pages of anime data
+all_anime <- data.frame()
+max_pages <- 5  # Adjust as needed to fetch more anime, 200 has been tried and worked well but waiting time is needed
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+for (page in 1:max_pages) {
+    url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
+    response <- GET(url)
+    
+    if (status_code(response) == 200) {
+        data <- content(response, "text", encoding = "UTF-8")
+        anime_data <- fromJSON(data)$data
+        
+        # Convert to DataFrame
+        if (!is.null(anime_data)) {
+            anime_df <- data.frame(
+                mal_id = anime_data$mal_id,
+                title = anime_data$title,
+                type = anime_data$type,
+                episodes = anime_data$episodes,
+                status = anime_data$status,
+                rating = anime_data$rating,
+                score = anime_data$score,
+                popularity = anime_data$popularity,
+                members = anime_data$members
+            )
+            
+            # **Check if mal_id already exists before inserting**
+            existing_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime")$mal_id
+            new_anime_df <- anime_df[!anime_df$mal_id %in% existing_ids, ]  # Remove duplicates
+
+            if (nrow(new_anime_df) > 0) {
+                dbWriteTable(conn, "anime", new_anime_df, append = TRUE, row.names = FALSE)
+            }
+
+            # Combine all data
+            all_anime <- rbind(all_anime, new_anime_df)
+        }
+    } else {
+        print(paste("Failed to fetch page", page))
+        break  # Stop if API rate limits
+    }
+    
+    Sys.sleep(1)  # Prevent hitting rate limit (60 requests/min)
+}
+
+# Check the total records fetched
+dbGetQuery(conn, "SELECT COUNT(*) FROM anime")
+
+
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+library(DBI)
+#conn <- dbConnect(SQLite(), "anime_database.sqlite")
+
+result <- dbGetQuery(conn, "SELECT * FROM anime")
+print(result)  # Display all anime data
+```
