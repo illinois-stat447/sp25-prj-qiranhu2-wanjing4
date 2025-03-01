@@ -1,5 +1,3 @@
-A line I wrote on my local computer
-
 # Covid-19 Analysis Website Application
 
 ## Authors
