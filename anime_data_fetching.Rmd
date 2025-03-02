@@ -1,0 +1,83 @@
+---
+title: "3-1-zoey"
+output: html_document
+date: "2025-03-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Connect to Data base
+
+```{r}
+library(httr)
+library(jsonlite)
+library(DBI)
+library(RSQLite)
+conn <- dbConnect(SQLite(), "anime_database.sqlite")
+
+```
+
+## fetch Data
+
+```{r}
+# Fetch multiple pages of anime data
+all_anime <- data.frame()
+max_pages <- 5  # Adjust as needed to fetch more anime, 200 has been tried and worked well but waiting time is needed
+
+for (page in 1:max_pages) {
+    url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
+    response <- GET(url)
+    
+    if (status_code(response) == 200) {
+        data <- content(response, "text", encoding = "UTF-8")
+        anime_data <- fromJSON(data)$data
+        
+        # Convert to DataFrame
+        if (!is.null(anime_data)) {
+            anime_df <- data.frame(
+                mal_id = anime_data$mal_id,
+                title = anime_data$title,
+                type = anime_data$type,
+                episodes = anime_data$episodes,
+                status = anime_data$status,
+                rating = anime_data$rating,
+                score = anime_data$score,
+                popularity = anime_data$popularity,
+                members = anime_data$members
+            )
+            
+            # **Check if mal_id already exists before inserting**
+            existing_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime")$mal_id
+            new_anime_df <- anime_df[!anime_df$mal_id %in% existing_ids, ]  # Remove duplicates
+
+            if (nrow(new_anime_df) > 0) {
+                dbWriteTable(conn, "anime", new_anime_df, append = TRUE, row.names = FALSE)
+            }
+
+            # Combine all data
+            all_anime <- rbind(all_anime, new_anime_df)
+        }
+    } else {
+        print(paste("Failed to fetch page", page))
+        break  # Stop if API rate limits
+    }
+    
+    Sys.sleep(1)  # Prevent hitting rate limit (60 requests/min)
+}
+
+# Check the total records fetched
+dbGetQuery(conn, "SELECT COUNT(*) FROM anime")
+
+
+
+```
+
+```{r}
+library(DBI)
+#conn <- dbConnect(SQLite(), "anime_database.sqlite")
+
+result <- dbGetQuery(conn, "SELECT * FROM anime")
+print(result)  # Display all anime data
+```

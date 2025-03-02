@@ -2,12 +2,43 @@ library(DBI)
 library(RSQLite)   
 library(shiny)     
 library(DT)        
-library(dplyr)      
+library(dplyr)
+library(httr)
+library(jsonlite)
 
-# Create database connection and load CSV
-con = dbConnect(SQLite(), "my_database.db")
-data = read.csv("data/Airbnb_Data.csv") 
-dbWriteTable(con, "my_table", data, overwrite = TRUE)
+# --------Just an example to scrape covid data, data might be changed------
+# Fetch data from API
+url <- "https://disease.sh/v3/covid-19/historical/USA?lastdays=all"
+response <- GET(url)
+
+# Convert response to JSON
+data <- content(response, as = "text", encoding = "UTF-8")
+parsed_data <- fromJSON(data)
+# Create a connection to an SQLite database
+con <- dbConnect(RSQLite::SQLite(), "covid_data.db")
+
+df <- data.frame(
+  country = parsed_data$country,
+  cases = unlist(parsed_data$timeline$cases),
+  deaths = unlist(parsed_data$timeline$deaths),
+  recovered = unlist(parsed_data$timeline$recovered),
+  date = as.Date(names(parsed_data$timeline$cases), format = "%m/%d/%y")  # date is parsed wrong, need to fix
+)
+
+# Store in SQL database
+dbWriteTable(con, "covid_cases", df, overwrite = TRUE)
+
+# Check the stored data
+dbListTables(con)
+
+# Fetch records
+query <- "SELECT * FROM covid_cases WHERE cases > 10000 ORDER BY date DESC"
+result <- dbGetQuery(con, query)
+
+# Display the result
+#print(result) # uncomment to see the results
+
+# -------------------------------------------------------------
 
 ui = fluidPage(
   titlePanel("Database Table Viewer with Property Type Search"),
