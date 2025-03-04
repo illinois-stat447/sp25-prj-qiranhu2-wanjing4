@@ -1,4 +1,4 @@
-# Covid-19 Analysis Website Application
+# Anime Data Analysis Website Application
 
 ## Authors
 
