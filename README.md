@@ -27,7 +27,7 @@ Through the [Jikan REST API](https://jikan.moe/), we can obtain the most updated
 
 The project will also answer the questions below
 
-1.  How have COVID-19 cases and deaths evolved over time in different countries and states?
+1.  What are the TOP100 anime of all time?
 
 2.  Are there seasonal patterns or periodic spikes in COVID-19 cases and deaths?
 
