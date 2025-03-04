@@ -12,6 +12,30 @@ Zoey Yao ([wanjing4\@illinois.edu](mailto:wanjing4@illinois.edu))
 
 This project aims to develop a Shiny website application that integrates with the anime Data API to analyze the popularity trend of anime. Interactive visualizations and prediction analysis will be implemented. The application will provide valuable insights for researchers and the general public, enabling them to better understand public's taste on anime.
 
+## Research Question
+
+The project will also answer the questions below
+
+1.  What are the TOP100 anime of all time?
+
+2.  Which genre is the most popular?
+
+3.  Do certain genres attract more favorites or members than others?
+
+4.  What are the early warning indicators that signal a potential surge in COVID-19 cases?
+
+5. Are certain studios or producers more dominant in specific genres?
+    - Which studios or producers are best suited for specific genres?
+  
+6.  Are animes with higher scores generally watched by more users, or do niche, high-quality anime exist?
+
+7. How do the most popular anime compare to the highest-rated anime?
+
+## Summary of Insights
+- more to add
+- more to add
+- example: Anime who are in Action genre is most popular
+
 ## Data
 
 ### Data Source
@@ -34,25 +58,6 @@ Through the [Jikan REST API](https://jikan.moe/), we can obtain the most updated
 - genres - the specific style of anime
 - studios - the studios that made the anime
 - producers - the producers that made the anime
-
-## Research Question
-
-The project will also answer the questions below
-
-1.  What are the TOP100 anime of all time?
-
-2.  Which genre is the most popular?
-
-3.  Do certain genres attract more favorites or members than others?
-
-4.  What are the early warning indicators that signal a potential surge in COVID-19 cases?
-
-5. Are certain studios or producers more dominant in specific genres?
-    - Which studios or producers are best suited for specific genres?
-  
-6.  Are animes with higher scores generally watched by more users, or do niche, high-quality anime exist?
-
-7. How do the most popular anime compare to the highest-rated anime?
 
 ## Methodology
 ### Data Preprocessing
