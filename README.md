@@ -20,11 +20,8 @@ This project aims to develop a Shiny website application that integrates with th
 
 Through the [Jikan REST API](https://jikan.moe/), we can obtain the most updated data from the website, ensuring our application provides accurate and real-time information for all users.
 
-## Key Dimensions
-
--   Cases - number of covid cases each day, cumulative
-
--   Deaths - number of people died because of positive covid test
+### Key Dimensions
+- 
 
 ## Research Question
 
