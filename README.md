@@ -22,14 +22,12 @@ The project will also answer the questions below
 
 3.  Do certain genres attract more favorites or members than others?
 
-4.  What are the early warning indicators that signal a potential surge in COVID-19 cases?
-
-5. Are certain studios or producers more dominant in specific genres?
+4. Are certain studios or producers more dominant in specific genres?
     - Which studios or producers are best suited for specific genres?
   
-6.  Are animes with higher scores generally watched by more users, or do niche, high-quality anime exist?
+5.  Are animes with higher scores generally watched by more users, or do niche, high-quality anime exist?
 
-7. How do the most popular anime compare to the highest-rated anime?
+6. How do the most popular anime compare to the highest-rated anime?
 
 ## Summary of Insights
 - more to add
