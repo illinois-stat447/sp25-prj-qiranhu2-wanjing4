@@ -1,13 +1,18 @@
 # Anime Data Analysis Website Application
 
+## Overview
+Analysis of the trend of anime from the 1990s to 2020s and anime recommendation system to users.
+
 ## Authors
 
 Qiran Hu ([qiranhu2\@illinois.edu](mailto:qiranhu2@illinois.edu))\
 Zoey Yao ([wanjing4\@illinois.edu](mailto:wanjing4@illinois.edu))
 
+
+
 ## Project Proposal
 
-This project aims to develop a Shiny website application that integrates with the Covid Data API to analyze trend covid cases/deaths overtime. Interactive visualizations and time series analysis will be implemented. The application will provide valuable insights for researchers, policymakers, researchers, and the general public, enabling them to better understand the progression of the pandemic and prepare more effectively for future global health crises. By analyzing trends, identifying patterns, and comparing the impact across different regions, the application will support data-driven decision-making and improve readiness for potential outbreaks.
+This project aims to develop a Shiny website application that integrates with the anime Data API to analyze trend covid cases/deaths overtime. Interactive visualizations and time series analysis will be implemented. The application will provide valuable insights for researchers, policymakers, researchers, and the general public, enabling them to better understand the progression of the pandemic and prepare more effectively for future global health crises. By analyzing trends, identifying patterns, and comparing the impact across different regions, the application will support data-driven decision-making and improve readiness for potential outbreaks.
 
 ## Data
 
