@@ -1,4 +1,3 @@
-# Load required libraries
 library(shiny)
 library(shinyjs)
 library(httr)
@@ -6,127 +5,155 @@ library(jsonlite)
 library(DBI)
 library(RSQLite)
 library(DT)
+library(dplyr)
 
-# Establish database connection in global scope
+# Connect to SQLite database
 conn <- dbConnect(SQLite(), "anime_database.sqlite")
 
-# Define the User Interface (UI)
+fetch_genres <- function() {
+  genre_url <- "https://api.jikan.moe/v4/genres/anime"
+  response <- GET(genre_url)
+  
+  if (status_code(response) == 200) {
+    genre_data <- fromJSON(content(response, "text", encoding = "UTF-8"))$data
+    genre_df <- data.frame(
+      genre_id = genre_data$mal_id,
+      genre_name = genre_data$name
+    )
+    return(genre_df)
+  } else {
+    print("Failed to fetch genres")
+    return(NULL)
+  }
+}
+
+fetch_data <- function(pages) {
+  withProgress(message = "Fetching anime data", value = 0, {
+    genres_df <- fetch_genres()
+    all_anime_df <- data.frame() # Initialize an empty data frame to accumulate data
+    
+    for (page in 1:pages) {
+      tryCatch({
+        url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
+        response <- GET(url)
+        
+        if (status_code(response) == 200) {
+          data <- content(response, "text", encoding = "UTF-8")
+          anime_data_json <- fromJSON(data)$data
+          
+          if (!is.null(anime_data_json) && nrow(anime_data_json) > 0) {
+            # Extract genres safely
+            genres_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
+              genres_list <- anime_data_json$genres[[i]]
+              if (is.null(genres_list) || length(genres_list) == 0) {
+                return("")
+              } else {
+                return(paste(genres_list$name, collapse = ", "))
+              }
+            })
+            
+            # Create data frame with all fields, directly assigning columns
+            anime_df <- data.frame(
+              mal_id = anime_data_json$mal_id,
+              title = anime_data_json$title,
+              type = replace(anime_data_json$type, is.na(anime_data_json$type), NA),
+              episodes = replace(anime_data_json$episodes, is.na(anime_data_json$episodes), NA),
+              status = replace(anime_data_json$status, is.na(anime_data_json$status), NA),
+              rating = replace(anime_data_json$rating, is.na(anime_data_json$rating), NA),
+              score = replace(anime_data_json$score, is.na(anime_data_json$score), NA),
+              scored_by = replace(anime_data_json$scored_by, is.na(anime_data_json$scored_by), NA),
+              rank = replace(anime_data_json$rank, is.na(anime_data_json$rank), NA),
+              popularity = replace(anime_data_json$popularity, is.na(anime_data_json$popularity), NA),
+              members = replace(anime_data_json$members, is.na(anime_data_json$members), NA),
+              favorites = replace(anime_data_json$favorites, is.na(anime_data_json$favorites), NA),
+              genres = genres_vec
+            )
+            
+            # Accumulate data across pages
+            all_anime_df <- rbind(all_anime_df, anime_df)
+          }
+        } else {
+          print(paste("HTTP status code:", status_code(response)))
+        }
+      }, error = function(e) {
+        print(paste("Error fetching page", page, ":", e$message))
+      })
+      
+      Sys.sleep(1)
+      incProgress(1 / pages)
+    }
+    
+    # After fetching all pages, drop and rewrite the table
+    if (nrow(all_anime_df) > 0) {
+      if (dbExistsTable(conn, "anime")) {
+        dbExecute(conn, "DROP TABLE anime")
+      }
+      dbWriteTable(conn, "anime", all_anime_df, overwrite = TRUE)
+    }
+  })
+}
+
 ui <- fluidPage(
-  # Enable shinyjs for dynamic UI control
   useShinyjs(),
-  
-  # Title of the app
   titlePanel("Anime Data Fetcher"),
-  
-  # Layout with sidebar and main panel
   sidebarLayout(
     sidebarPanel(
-      # Input for number of pages to fetch
       numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
-      
-      # Button to fetch new data
-      actionButton("fetch", "Fetch Data"),
-      
-      # Button to view existing data
-      actionButton("view", "View Existing Data")
+      actionButton("fetch_show", "Fetch & Show Data"),
+      textInput("search", "Search by title:", placeholder = "Enter title keywords")
     ),
-    
     mainPanel(
-      # Output for the interactive data table
       DT::dataTableOutput("animeTable")
     )
   )
 )
 
-# Define the Server Logic
 server <- function(input, output, session) {
-  # Reactive value to store and update anime data for display
-  anime_data <- reactiveVal()
+  data_version <- reactiveVal(0)
   
-  # Function to fetch anime data from the API
-  fetch_data <- function(pages) {
-    # Show progress bar during fetching
-    withProgress(message = "Fetching data", value = 0, {
-      for (page in 1:pages) {
-        # Handle potential errors gracefully
-        tryCatch({
-          # Construct API URL
-          url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
-          response <- GET(url)
-          
-          # Check if request was successful
-          if (status_code(response) == 200) {
-            data <- content(response, "text", encoding = "UTF-8")
-            anime_data <- fromJSON(data)$data
-            
-            # Process data if available
-            if (!is.null(anime_data)) {
-              # Create data frame from API response
-              anime_df <- data.frame(
-                mal_id = anime_data$mal_id,
-                title = anime_data$title,
-                type = anime_data$type,
-                episodes = anime_data$episodes,
-                status = anime_data$status,
-                rating = anime_data$rating,
-                score = anime_data$score,
-                popularity = anime_data$popularity,
-                members = anime_data$members
-              )
-              
-              # Check if table exists; create it if not, otherwise append new data
-              if (!dbExistsTable(conn, "anime")) {
-                dbWriteTable(conn, "anime", anime_df, overwrite = TRUE)
-              } else {
-                # Get existing IDs to avoid duplicates
-                existing_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime")$mal_id
-                new_anime_df <- anime_df[!anime_df$mal_id %in% existing_ids, ]
-                if (nrow(new_anime_df) > 0) {
-                  dbWriteTable(conn, "anime", new_anime_df, append = TRUE)
-                }
-              }
-            }
-          } else {
-            showNotification(paste("Failed to fetch page", page), type = "error")
-          }
-        }, error = function(e) {
-          # Notify user of any errors
-          showNotification(paste("Error fetching page", page, ":", e$message), type = "error")
-        })
-        
-        # Delay to respect API rate limits (60 requests/min)
-        Sys.sleep(1)
-        
-        # Update progress bar
-        incProgress(1 / pages)
-      }
-      
-      # After fetching, update the reactive value with all data from database
-      current_data <- dbGetQuery(conn, "SELECT * FROM anime")
-      anime_data(current_data)
-    })
-  }
-  
-  # Event handler for Fetch Data button
-  observeEvent(input$fetch, {
-    # Disable button during fetch to prevent multiple clicks
-    shinyjs::disable("fetch")
+  observeEvent(input$fetch_show, {
+    shinyjs::disable("fetch_show")
     fetch_data(input$pages)
-    shinyjs::enable("fetch")
+    data_version(data_version() + 1)
+    shinyjs::enable("fetch_show")
   })
   
-  # Event handler for View Existing Data button
-  observeEvent(input$view, {
-    # Retrieve and display current database contents
-    current_data <- dbGetQuery(conn, "SELECT * FROM anime")
-    anime_data(current_data)
+  filtered_data <- reactive({
+    data_version()
+    if (dbExistsTable(conn, "anime")) {
+      if (input$search == "" || is.null(input$search)) {
+        dbGetQuery(conn, "SELECT * FROM anime")
+      } else {
+        search_term <- paste0("%", tolower(input$search), "%")
+        dbGetQuery(conn, "SELECT * FROM anime WHERE LOWER(title) LIKE ?", 
+                   params = list(search_term))
+      }
+    } else {
+      data.frame(
+        mal_id = integer(0),
+        title = character(0),
+        type = character(0),
+        episodes = integer(0),
+        status = character(0),
+        rating = character(0),
+        score = numeric(0),
+        scored_by = integer(0),
+        rank = integer(0),
+        popularity = integer(0),
+        members = integer(0),
+        favorites = integer(0),
+        genres = character(0)
+      )
+    }
   })
   
-  # Render the interactive data table
   output$animeTable <- DT::renderDataTable({
-    anime_data()
+    datatable(filtered_data(), options = list(searching = FALSE))
+  })
+  
+  onStop(function() {
+    dbDisconnect(conn)
   })
 }
 
-# Launch the Shiny app
 shinyApp(ui = ui, server = server)
