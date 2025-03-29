@@ -8,15 +8,15 @@ library(DT)
 library(dplyr)
 library(plotly)
 
-conn =  dbConnect(SQLite(), "anime_database.sqlite")
+conn = dbConnect(SQLite(), "anime_database.sqlite")
 
-fetch_genres =  function() {
-  genre_url =  "https://api.jikan.moe/v4/genres/anime"
-  response =  GET(genre_url)
+fetch_genres = function() {
+  genre_url = "https://api.jikan.moe/v4/genres/anime"
+  response = GET(genre_url)
   
   if (status_code(response) == 200) {
-    genre_data =  fromJSON(content(response, "text", encoding = "UTF-8"))$data
-    genre_df =  data.frame(
+    genre_data = fromJSON(content(response, "text", encoding = "UTF-8"))$data
+    genre_df = data.frame(
       genre_id = genre_data$mal_id,
       genre_name = genre_data$name,
       stringsAsFactors = FALSE
@@ -28,23 +28,23 @@ fetch_genres =  function() {
   }
 }
 
-fetch_data =  function(pages) {
+fetch_data = function(pages) {
   withProgress(message = "Fetching anime data", value = 0, {
-    genres_df =  fetch_genres()
-    all_anime_df =  data.frame() 
+    genres_df = fetch_genres()
+    all_anime_df = data.frame() 
     
     for (page in 1:pages) {
       tryCatch({
-        url =  paste0("https://api.jikan.moe/v4/anime?page=", page)
-        response =  GET(url)
+        url = paste0("https://api.jikan.moe/v4/anime?page=", page)
+        response = GET(url)
         
         if (status_code(response) == 200) {
-          data =  content(response, "text", encoding = "UTF-8")
-          anime_data_json =  fromJSON(data)$data
+          data = content(response, "text", encoding = "UTF-8")
+          anime_data_json = fromJSON(data)$data
           
           if (!is.null(anime_data_json) && nrow(anime_data_json) > 0) {
-            genres_vec =  sapply(seq_len(nrow(anime_data_json)), function(i) {
-              genres_list =  anime_data_json$genres[[i]]
+            genres_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
+              genres_list = anime_data_json$genres[[i]]
               if (is.null(genres_list) || length(genres_list) == 0) {
                 return("")
               } else {
@@ -52,8 +52,8 @@ fetch_data =  function(pages) {
               }
             })
             
-            studios_vec =  sapply(seq_len(nrow(anime_data_json)), function(i) {
-              studios_list =  anime_data_json$studios[[i]]
+            studios_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
+              studios_list = anime_data_json$studios[[i]]
               if (is.null(studios_list) || length(studios_list) == 0) {
                 return("")
               } else {
@@ -61,8 +61,8 @@ fetch_data =  function(pages) {
               }
             })
             
-            producers_vec =  sapply(seq_len(nrow(anime_data_json)), function(i) {
-              producers_list =  anime_data_json$producers[[i]]
+            producers_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
+              producers_list = anime_data_json$producers[[i]]
               if (is.null(producers_list) || length(producers_list) == 0) {
                 return("")
               } else {
@@ -70,7 +70,7 @@ fetch_data =  function(pages) {
               }
             })
             
-            anime_df =  data.frame(
+            anime_df = data.frame(
               mal_id = anime_data_json$mal_id,
               title = anime_data_json$title,
               type = replace(anime_data_json$type, is.na(anime_data_json$type), NA),
@@ -89,7 +89,7 @@ fetch_data =  function(pages) {
               stringsAsFactors = FALSE
             )
             
-            all_anime_df =  rbind(all_anime_df, anime_df)
+            all_anime_df = rbind(all_anime_df, anime_df)
           }
         } 
       }, error = function(e) {
@@ -109,7 +109,7 @@ fetch_data =  function(pages) {
   })
 }
 
-ui =  fluidPage(
+ui = fluidPage(
   useShinyjs(),
   titlePanel("Anime Data Fetcher"),
   sidebarLayout(
@@ -127,8 +127,8 @@ ui =  fluidPage(
   )
 )
 
-server =  function(input, output, session) {
-  data_version =  reactiveVal(0)
+server = function(input, output, session) {
+  data_version = reactiveVal(0)
   
   observeEvent(input$fetch_show, {
     shinyjs::disable("fetch_show")
@@ -137,13 +137,13 @@ server =  function(input, output, session) {
     shinyjs::enable("fetch_show")
   })
   
-  filtered_data =  reactive({
+  filtered_data = reactive({
     data_version()
     if (dbExistsTable(conn, "anime")) {
       if (input$search == "" || is.null(input$search)) {
         dbGetQuery(conn, "SELECT * FROM anime")
       } else {
-        search_term =  paste0("%", tolower(input$search), "%")
+        search_term = paste0("%", tolower(input$search), "%")
         dbGetQuery(conn, "SELECT * FROM anime WHERE LOWER(title) LIKE ?", 
                    params = list(search_term))
       }
@@ -169,7 +169,7 @@ server =  function(input, output, session) {
     }
   })
   
-  output$animeTable =  DT::renderDataTable({
+  output$animeTable = DT::renderDataTable({
     datatable(filtered_data(), options = list(searching = FALSE))
   })
   
@@ -213,8 +213,6 @@ server =  function(input, output, session) {
         paper_bgcolor = "rgba(240,240,240,0.95)"
       )
   })
-  
-  
   
   onStop(function() {
     dbDisconnect(conn)
