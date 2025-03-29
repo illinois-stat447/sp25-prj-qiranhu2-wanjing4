@@ -23,7 +23,9 @@ Through the Yelp Fusion Market API, we can obtain the most updated data from the
 
 The project will also answer the questions below
 
-1.  How have COVID-19 cases and deaths evolved over time in different countries and states?
+1.  Are the highest-rated anime also the most widely watched? 
+
+Do anime with top user scores also have the largest number of viewers/members, or are there highly rated “hidden gem” series that relatively few people have seen? Conversely, are some extremely popular titles only moderately rated?
 
 2.  Are there seasonal patterns or periodic spikes in COVID-19 cases and deaths?
 
