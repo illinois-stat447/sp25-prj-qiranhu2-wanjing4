@@ -25,7 +25,7 @@ The project will also answer the questions below
 
 2.  What do the most “favorite” anime have in common?
 
-    -   Are the series that fans mark as favorites usually the highest-scoring and most popular ones?
+    -   Are fans marking their favorites usually the highest-scoring and most popular ones?
 
     -   Do certain genres or unique content qualities inspire a disproportionately high number of favorites even if those anime aren’t at the very top of the popularity charts?
 
