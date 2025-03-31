@@ -7,6 +7,7 @@ library(RSQLite)
 library(DT)
 library(dplyr)
 library(plotly)
+library(ggplot2)
 
 conn = dbConnect(SQLite(), "anime_database.sqlite")
 
@@ -121,7 +122,12 @@ ui = fluidPage(
     mainPanel(
       tabsetPanel(
         tabPanel("Data Table", DT::dataTableOutput("animeTable")),
-        tabPanel("Interactive Data Visulization", plotlyOutput("scatterPlot"))
+        tabPanel("Interactive Data Visualization", 
+                 fluidRow(
+                   column(12, plotlyOutput("scatterPlot")),
+                   column(12, plotlyOutput("bubblePlot"))
+                 )
+        )
       )
     )
   )
@@ -173,9 +179,9 @@ server = function(input, output, session) {
     datatable(filtered_data(), options = list(searching = FALSE))
   })
   
-  output$scatterPlot <- renderPlotly({
-    data <- filtered_data()
-    data <- data[!is.na(data$score) & !is.na(data$members), ]
+  output$scatterPlot = renderPlotly({
+    data = filtered_data()
+    data = data[!is.na(data$score) & !is.na(data$members), ]
     if (nrow(data) == 0) return(NULL)
     
     plot_ly(
@@ -197,8 +203,8 @@ server = function(input, output, session) {
         ),
         cmin = min(data$score, na.rm = TRUE),
         cmax = max(data$score, na.rm = TRUE),
-        colorbar = list(title = "Score"),
-        line = list(width = 1, color = 'black')
+        colorbar = list(title = "Score")
+        # Remove line property completely
       ),
       text = ~paste("Title:", title,
                     "<br>Score:", score,
@@ -206,12 +212,59 @@ server = function(input, output, session) {
       hoverinfo = "text"
     ) %>%
       layout(
-        title = "Scatter Plot between Anime Score and Viewers",
+        title = "Score vs. Viewers",
         xaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
         yaxis = list(title = "Viewers", showgrid = TRUE, zeroline = FALSE),
         plot_bgcolor = "rgba(240,240,240,0.95)",
         paper_bgcolor = "rgba(240,240,240,0.95)"
       )
+  })
+  
+  output$bubblePlot = renderPlotly({
+    data = filtered_data()
+    data = data[!is.na(data$favorites) & !is.na(data$score) & !is.na(data$popularity), ]
+    if (nrow(data) == 0) return(NULL)
+    
+
+    p = plot_ly()
+    unique_genres = unique(data$genres)
+    genre_colors = colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(unique_genres))
+    
+    for (i in 1:length(unique_genres)) {
+      if (unique_genres[i] == "") next
+      
+      genre_data = data[data$genres == unique_genres[i], ]
+      if (nrow(genre_data) > 0) {
+        p = add_trace(p,
+                       data = genre_data,
+                       x = ~popularity,
+                       y = ~score,
+                       type = 'scatter',
+                       mode = 'markers',
+                       marker = list(
+                         size = ~sqrt(favorites)/10, 
+                         sizemode = 'area',
+                         opacity = 0.7,
+                         color = genre_colors[i],
+                         line = list(width = 1, color = 'black')
+                       ),
+                       text = ~paste("Title:", title,
+                                     "<br>Genres:", genres,
+                                     "<br>Favorites:", favorites,
+                                     "<br>Score:", score,
+                                     "<br>Popularity:", popularity),
+                       hoverinfo = "text",
+                       name = unique_genres[i]
+        )
+      }
+    }
+    p %>% layout(
+      title = "Favorites vs. Score & Popularity by Genre Combination",
+      xaxis = list(title = "Popularity", showgrid = TRUE, zeroline = FALSE),
+      yaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
+      plot_bgcolor = "rgba(240,240,240,0.95)",
+      paper_bgcolor = "rgba(240,240,240,0.95)"
+    )
   })
   
   onStop(function() {
