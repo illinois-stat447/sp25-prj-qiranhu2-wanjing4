@@ -117,7 +117,17 @@ ui = fluidPage(
     sidebarPanel(
       numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
-      textInput("search", "Search by title:", placeholder = "Enter title keywords")
+      textInput("search", "Search by title:", placeholder = "Enter title keywords"),
+      
+      sliderInput("score", "Score(0 to 10)", 
+                  min = 0, max = 10, step = 0.1, value = c(0, 10)),
+      
+      
+      #selectInput("genre", "Genre", 
+                  #choices = unique(all_anime_df$`Genre`), selected = NULL, multiple = TRUE),
+      
+      
+      
     ),
     mainPanel(
       tabsetPanel(
@@ -273,3 +283,4 @@ server = function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
+
