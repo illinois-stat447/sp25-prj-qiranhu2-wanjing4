@@ -163,18 +163,19 @@ server = function(input, output, session) {
       ))
     }
     
-    # Start building query
+    # Create structure for SQL query then use paste to connect them later
     base_query <- "SELECT * FROM anime"
     conditions <- c()
     params <- list()
     
-    # Add title search if provided
+    # Handle optional title search filter
+    
     if (!is.null(input$search) && input$search != "") {
       conditions <- c(conditions, "LOWER(title) LIKE ?")
       params <- c(params, paste0("%", tolower(input$search), "%"))
     }
     
-    # Add score filter if provided
+    # Handle optional score filter
     if (!is.null(input$score) && length(input$score) == 2) {
       conditions <- c(conditions, "score BETWEEN ? AND ?")
       params <- c(params, input$score[1], input$score[2])
