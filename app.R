@@ -127,7 +127,6 @@ ui = fluidPage(
                   #choices = unique(all_anime_df$`Genre`), selected = NULL, multiple = TRUE),
       
       
-      
     ),
     mainPanel(
       tabsetPanel(
@@ -153,18 +152,11 @@ server = function(input, output, session) {
     shinyjs::enable("fetch_show")
   })
   
-  filtered_data = reactive({
+  filtered_data <- reactive({
     data_version()
-    if (dbExistsTable(conn, "anime")) {
-      if (input$search == "" || is.null(input$search)) {
-        dbGetQuery(conn, "SELECT * FROM anime")
-      } else {
-        search_term = paste0("%", tolower(input$search), "%")
-        dbGetQuery(conn, "SELECT * FROM anime WHERE LOWER(title) LIKE ?", 
-                   params = list(search_term))
-      }
-    } else {
-      data.frame(
+    
+    if (!dbExistsTable(conn, "anime")) {
+      return(data.frame(
         mal_id = integer(0),
         title = character(0),
         type = character(0),
@@ -181,9 +173,41 @@ server = function(input, output, session) {
         studios = character(0),
         producers = character(0),
         stringsAsFactors = FALSE
-      )
+      ))}
+    
+    
+    # Create structure for SQL query then use paste to connect them later
+    base_query <- "SELECT * FROM anime"
+    conditions <- c()
+    params <- list()
+    
+    # Handle optional title search filter
+    
+    if (!is.null(input$search) && input$search != "") {
+      conditions <- c(conditions, "LOWER(title) LIKE ?")
+      params <- c(params, paste0("%", tolower(input$search), "%"))
     }
+    
+    # Handle optional score filter
+    if (!is.null(input$score) && length(input$score) == 2) {
+      conditions <- c(conditions, "score BETWEEN ? AND ?")
+      params <- c(params, input$score[1], input$score[2])
+    }
+    
+    
+    # Combine query
+    if (length(conditions) > 0) {
+      query <- paste(base_query, "WHERE", paste(conditions, collapse = " AND "))
+    } else {
+      query <- base_query
+    }
+    
+    dbGetQuery(conn, query, params = params)
   })
+  
+  
+  
+  
   
   output$animeTable = DT::renderDataTable({
     datatable(filtered_data(), options = list(searching = FALSE))
