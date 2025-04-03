@@ -6,6 +6,8 @@ library(DBI)
 library(RSQLite)
 library(DT)
 library(dplyr)
+library(plotly)
+library(ggplot2)
 
 conn = dbConnect(SQLite(), "anime_database.sqlite")
 
@@ -17,7 +19,8 @@ fetch_genres = function() {
     genre_data = fromJSON(content(response, "text", encoding = "UTF-8"))$data
     genre_df = data.frame(
       genre_id = genre_data$mal_id,
-      genre_name = genre_data$name
+      genre_name = genre_data$name,
+      stringsAsFactors = FALSE
     )
     return(genre_df)
   } else {
@@ -83,7 +86,8 @@ fetch_data = function(pages) {
               favorites = replace(anime_data_json$favorites, is.na(anime_data_json$favorites), NA),
               genres = genres_vec,
               studios = studios_vec,
-              producers = producers_vec
+              producers = producers_vec,
+              stringsAsFactors = FALSE
             )
             
             all_anime_df = rbind(all_anime_df, anime_df)
@@ -96,7 +100,7 @@ fetch_data = function(pages) {
       Sys.sleep(1)
       incProgress(1 / pages)
     }
-
+    
     if (nrow(all_anime_df) > 0) {
       if (dbExistsTable(conn, "anime")) {
         dbExecute(conn, "DROP TABLE anime")
@@ -125,7 +129,15 @@ ui = fluidPage(
       
     ),
     mainPanel(
-      DT::dataTableOutput("animeTable")
+      tabsetPanel(
+        tabPanel("Data Table", DT::dataTableOutput("animeTable")),
+        tabPanel("Interactive Data Visualization", 
+                 fluidRow(
+                   column(12, plotlyOutput("scatterPlot")),
+                   column(12, plotlyOutput("bubblePlot"))
+                 )
+        )
+      )
     )
   )
 )
@@ -159,9 +171,10 @@ server = function(input, output, session) {
         favorites = integer(0),
         genres = character(0),
         studios = character(0),
-        producers = character(0)
-      ))
-    }
+        producers = character(0),
+        stringsAsFactors = FALSE
+      ))}
+    
     
     # Create structure for SQL query then use paste to connect them later
     base_query <- "SELECT * FROM anime"
@@ -200,11 +213,98 @@ server = function(input, output, session) {
     datatable(filtered_data(), options = list(searching = FALSE))
   })
   
+  output$scatterPlot = renderPlotly({
+    data = filtered_data()
+    data = data[!is.na(data$score) & !is.na(data$members), ]
+    if (nrow(data) == 0) return(NULL)
+    
+    plot_ly(
+      data,
+      x = ~score,
+      y = ~members,
+      type = 'scatter',
+      mode = 'markers',
+      marker = list(
+        size = 10,
+        color = ~score,
+        colorscale = list(
+          c(0, "#F4F7F7"),
+          c(0.3, "#D5E5E5"), 
+          c(0.5, "#AACFD0"), 
+          c(0.7, "#79A8A9"), 
+          c(0.9, "#1F4E5F"),
+          c(1, "#18230F")
+        ),
+        cmin = min(data$score, na.rm = TRUE),
+        cmax = max(data$score, na.rm = TRUE),
+        colorbar = list(title = "Score")
+        # Remove line property completely
+      ),
+      text = ~paste("Title:", title,
+                    "<br>Score:", score,
+                    "<br>Viewers:", members),
+      hoverinfo = "text"
+    ) %>%
+      layout(
+        title = "Score vs. Viewers",
+        xaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
+        yaxis = list(title = "Viewers", showgrid = TRUE, zeroline = FALSE),
+        plot_bgcolor = "rgba(240,240,240,0.95)",
+        paper_bgcolor = "rgba(240,240,240,0.95)"
+      )
+  })
+  
+  output$bubblePlot = renderPlotly({
+    data = filtered_data()
+    data = data[!is.na(data$favorites) & !is.na(data$score) & !is.na(data$popularity), ]
+    if (nrow(data) == 0) return(NULL)
+    
+
+    p = plot_ly()
+    unique_genres = unique(data$genres)
+    genre_colors = colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(unique_genres))
+    
+    for (i in 1:length(unique_genres)) {
+      if (unique_genres[i] == "") next
+      
+      genre_data = data[data$genres == unique_genres[i], ]
+      if (nrow(genre_data) > 0) {
+        p = add_trace(p,
+                       data = genre_data,
+                       x = ~popularity,
+                       y = ~score,
+                       type = 'scatter',
+                       mode = 'markers',
+                       marker = list(
+                         size = ~sqrt(favorites)/10, 
+                         sizemode = 'area',
+                         opacity = 0.7,
+                         color = genre_colors[i],
+                         line = list(width = 1, color = 'black')
+                       ),
+                       text = ~paste("Title:", title,
+                                     "<br>Genres:", genres,
+                                     "<br>Favorites:", favorites,
+                                     "<br>Score:", score,
+                                     "<br>Popularity:", popularity),
+                       hoverinfo = "text",
+                       name = unique_genres[i]
+        )
+      }
+    }
+    p %>% layout(
+      title = "Favorites vs. Score & Popularity by Genre Combination",
+      xaxis = list(title = "Popularity", showgrid = TRUE, zeroline = FALSE),
+      yaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
+      plot_bgcolor = "rgba(240,240,240,0.95)",
+      paper_bgcolor = "rgba(240,240,240,0.95)"
+    )
+  })
+  
   onStop(function() {
     dbDisconnect(conn)
   })
 }
 
-
-
 shinyApp(ui = ui, server = server)
+
