@@ -8,6 +8,7 @@ library(DT)
 library(dplyr)
 library(plotly)
 library(ggplot2)
+library(shinythemes)
 
 conn = dbConnect(SQLite(), "anime_database.sqlite")
 
@@ -111,6 +112,7 @@ fetch_data = function(pages) {
 }
 
 ui = fluidPage(
+  fluidPage(theme = shinytheme("united")),
   useShinyjs(),
   titlePanel("Anime Data Fetcher"),
   sidebarLayout(
@@ -121,10 +123,11 @@ ui = fluidPage(
       # score filter
       sliderInput("score", "Score(0 to 10)", 
                   min = 0, max = 10, step = 0.1, value = c(0, 10)),
-      uiOutput("rating")
+      uiOutput("rating"),
+      uiOutput("type")
+      # genre select will be implemented later
       
     
-      
       
       
     ),
@@ -165,6 +168,22 @@ server = function(input, output, session) {
     selected = NULL, multiple = TRUE)
   }) 
   
+  # Below is technique to provide suggested fields for type search
+  
+  type_type <- reactive({
+    if (!dbExistsTable(conn, "anime")) {
+      return(NULL)
+    }
+    df = dbGetQuery(conn, "SELECT DISTINCT type FROM anime WHERE type IS NOT NULL")
+  })
+  
+  output$type = renderUI({
+    selectInput("type", "Type (OVA, TV, etc)", choices = type_type(),
+                selected = NULL, multiple = TRUE)
+  }) 
+  
+  
+  # filter final data
   filtered_data <- reactive({
     data_version()
     
@@ -212,6 +231,13 @@ server = function(input, output, session) {
       placeholder <- paste(rep("?", length(input$rating)), collapse = ", ")
       conditions <- c(conditions, paste0("rating IN (", placeholder, ")"))
       params <- c(params, input$rating)
+    }
+    
+    # Handle optional type filter
+    if (!is.null(input$type) && length(input$type) > 0) {
+      placeholder <- paste(rep("?", length(input$type)), collapse = ", ")
+      conditions <- c(conditions, paste0("type IN (", placeholder, ")"))
+      params <- c(params, input$type)
     }
     
     
