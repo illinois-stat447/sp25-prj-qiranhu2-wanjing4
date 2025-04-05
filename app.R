@@ -8,6 +8,7 @@ library(DT)
 library(dplyr)
 library(plotly)
 library(ggplot2)
+library(shinythemes)
 
 conn = dbConnect(SQLite(), "anime_database.sqlite")
 
@@ -111,6 +112,7 @@ fetch_data = function(pages) {
 }
 
 ui = fluidPage(
+  fluidPage(theme = shinytheme("united")),
   useShinyjs(),
   titlePanel("Anime Data Fetcher"),
   sidebarLayout(
