@@ -118,13 +118,13 @@ ui = fluidPage(
       numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
       textInput("search", "Search by title:", placeholder = "Enter title keywords"),
-      
+      # score filter
       sliderInput("score", "Score(0 to 10)", 
                   min = 0, max = 10, step = 0.1, value = c(0, 10)),
+      uiOutput("rating")
       
+    
       
-      #selectInput("genre", "Genre", 
-                  #choices = unique(all_anime_df$`Genre`), selected = NULL, multiple = TRUE),
       
       
     ),
@@ -151,6 +151,19 @@ server = function(input, output, session) {
     data_version(data_version() + 1)
     shinyjs::enable("fetch_show")
   })
+  # Below is technique to provide suggested fields for rating search
+  
+  rating_type <- reactive({
+    if (!dbExistsTable(conn, "anime")) {
+      return(NULL)
+    }
+    df = dbGetQuery(conn, "SELECT DISTINCT rating FROM anime WHERE rating IS NOT NULL")
+  })
+  
+  output$rating = renderUI({
+    selectInput("rating", "Rating (PG, PG13, etc)", choices = rating_type(),
+    selected = NULL, multiple = TRUE)
+  }) 
   
   filtered_data <- reactive({
     data_version()
@@ -192,6 +205,13 @@ server = function(input, output, session) {
     if (!is.null(input$score) && length(input$score) == 2) {
       conditions <- c(conditions, "score BETWEEN ? AND ?")
       params <- c(params, input$score[1], input$score[2])
+    }
+    
+    # Handle optional rating filter
+    if (!is.null(input$rating) && length(input$rating) > 0) {
+      placeholder <- paste(rep("?", length(input$rating)), collapse = ", ")
+      conditions <- c(conditions, paste0("rating IN (", placeholder, ")"))
+      params <- c(params, input$rating)
     }
     
     
