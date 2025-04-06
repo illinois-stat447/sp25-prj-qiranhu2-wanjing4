@@ -9,16 +9,17 @@ library(dplyr)
 library(plotly)
 library(ggplot2)
 library(shinythemes)
+library(tidyr)
 
-conn = dbConnect(SQLite(), "anime_database.sqlite")
+conn <- dbConnect(SQLite(), "anime_database.sqlite")
 
-fetch_genres = function() {
-  genre_url = "https://api.jikan.moe/v4/genres/anime"
-  response = GET(genre_url)
+fetch_genres <- function() {
+  genre_url <- "https://api.jikan.moe/v4/genres/anime"
+  response <- GET(genre_url)
   
   if (status_code(response) == 200) {
-    genre_data = fromJSON(content(response, "text", encoding = "UTF-8"))$data
-    genre_df = data.frame(
+    genre_data <- fromJSON(content(response, "text", encoding = "UTF-8"))$data
+    genre_df <- data.frame(
       genre_id = genre_data$mal_id,
       genre_name = genre_data$name,
       stringsAsFactors = FALSE
@@ -30,49 +31,43 @@ fetch_genres = function() {
   }
 }
 
-fetch_data = function(pages) {
+fetch_data <- function(pages) {
   withProgress(message = "Fetching anime data", value = 0, {
-    genres_df = fetch_genres()
-    all_anime_df = data.frame() 
-    
+    genres_df <- fetch_genres()
+    all_anime_df <- data.frame() 
     for (page in 1:pages) {
       tryCatch({
-        url = paste0("https://api.jikan.moe/v4/anime?page=", page)
-        response = GET(url)
-        
+        url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
+        response <- GET(url)
         if (status_code(response) == 200) {
-          data = content(response, "text", encoding = "UTF-8")
-          anime_data_json = fromJSON(data)$data
-          
+          data <- content(response, "text", encoding = "UTF-8")
+          anime_data_json <- fromJSON(data)$data
           if (!is.null(anime_data_json) && nrow(anime_data_json) > 0) {
-            genres_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
-              genres_list = anime_data_json$genres[[i]]
+            genres_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
+              genres_list <- anime_data_json$genres[[i]]
               if (is.null(genres_list) || length(genres_list) == 0) {
                 return("")
               } else {
                 return(paste(genres_list$name, collapse = ", "))
               }
             })
-            
-            studios_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
-              studios_list = anime_data_json$studios[[i]]
+            studios_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
+              studios_list <- anime_data_json$studios[[i]]
               if (is.null(studios_list) || length(studios_list) == 0) {
                 return("")
               } else {
                 return(paste(studios_list$name, collapse = ", "))
               }
             })
-            
-            producers_vec = sapply(seq_len(nrow(anime_data_json)), function(i) {
-              producers_list = anime_data_json$producers[[i]]
+            producers_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
+              producers_list <- anime_data_json$producers[[i]]
               if (is.null(producers_list) || length(producers_list) == 0) {
                 return("")
               } else {
                 return(paste(producers_list$name, collapse = ", "))
               }
             })
-            
-            anime_df = data.frame(
+            anime_df <- data.frame(
               mal_id = anime_data_json$mal_id,
               title = anime_data_json$title,
               type = replace(anime_data_json$type, is.na(anime_data_json$type), NA),
@@ -90,18 +85,15 @@ fetch_data = function(pages) {
               producers = producers_vec,
               stringsAsFactors = FALSE
             )
-            
-            all_anime_df = rbind(all_anime_df, anime_df)
+            all_anime_df <- rbind(all_anime_df, anime_df)
           }
         } 
       }, error = function(e) {
         print(paste("Error fetching page", page, ":", e$message))
       })
-      
       Sys.sleep(1)
       incProgress(1 / pages)
     }
-    
     if (nrow(all_anime_df) > 0) {
       if (dbExistsTable(conn, "anime")) {
         dbExecute(conn, "DROP TABLE anime")
@@ -111,25 +103,22 @@ fetch_data = function(pages) {
   })
 }
 
-ui = fluidPage(
+ui <- fluidPage(
   fluidPage(theme = shinytheme("united")),
-  useShinyjs(),
+  useShinyjs(),  # initialize shinyjs
   titlePanel("Anime Data Fetcher"),
   sidebarLayout(
     sidebarPanel(
       numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
-      textInput("search", "Search by title:", placeholder = "Enter title keywords"),
-      # score filter
-      sliderInput("score", "Score(0 to 10)", 
-                  min = 0, max = 10, step = 0.1, value = c(0, 10)),
-      uiOutput("rating"),
-      uiOutput("type")
-      # genre select will be implemented later
-      
-    
-      
-      
+      div(id = "filter_inputs",
+          textInput("search", "Search by title:", placeholder = "Enter title keywords"),
+          sliderInput("score", "Score (0 to 10)", min = 0, max = 10, step = 0.1, value = c(0, 10)),
+          uiOutput("rating"),
+          uiOutput("type"),
+          uiOutput("genre_filter")
+      ),
+      actionButton("reset_filters", "Reset Filters")
     ),
     mainPanel(
       tabsetPanel(
@@ -138,6 +127,12 @@ ui = fluidPage(
                  fluidRow(
                    column(12, plotlyOutput("scatterPlot")),
                    column(12, plotlyOutput("bubblePlot"))
+                 ),
+                 fluidRow(
+                   column(12, plotlyOutput("polarBarChart"))
+                 ),
+                 fluidRow(
+                   column(12, plotlyOutput("areaPlot"))
                  )
         )
       )
@@ -145,8 +140,8 @@ ui = fluidPage(
   )
 )
 
-server = function(input, output, session) {
-  data_version = reactiveVal(0)
+server <- function(input, output, session) {
+  data_version <- reactiveVal(0)
   
   observeEvent(input$fetch_show, {
     shinyjs::disable("fetch_show")
@@ -154,39 +149,48 @@ server = function(input, output, session) {
     data_version(data_version() + 1)
     shinyjs::enable("fetch_show")
   })
-  # Below is technique to provide suggested fields for rating search
+  
+  observeEvent(input$reset_filters, {
+    reset("filter_inputs")
+  })
   
   rating_type <- reactive({
-    if (!dbExistsTable(conn, "anime")) {
-      return(NULL)
-    }
-    df = dbGetQuery(conn, "SELECT DISTINCT rating FROM anime WHERE rating IS NOT NULL")
+    if (!dbExistsTable(conn, "anime")) return(NULL)
+    dbGetQuery(conn, "SELECT DISTINCT rating FROM anime WHERE rating IS NOT NULL")
   })
   
-  output$rating = renderUI({
-    selectInput("rating", "Rating (PG, PG13, etc)", choices = rating_type(),
-    selected = NULL, multiple = TRUE)
-  }) 
-  
-  # Below is technique to provide suggested fields for type search
+  output$rating <- renderUI({
+    selectInput("rating", "Rating (PG, PG13, etc)", 
+                choices = rating_type() %>% pull(rating),
+                selected = NULL, multiple = TRUE)
+  })
   
   type_type <- reactive({
-    if (!dbExistsTable(conn, "anime")) {
-      return(NULL)
-    }
-    df = dbGetQuery(conn, "SELECT DISTINCT type FROM anime WHERE type IS NOT NULL")
+    if (!dbExistsTable(conn, "anime")) return(NULL)
+    dbGetQuery(conn, "SELECT DISTINCT type FROM anime WHERE type IS NOT NULL")
   })
   
-  output$type = renderUI({
-    selectInput("type", "Type (OVA, TV, etc)", choices = type_type(),
+  output$type <- renderUI({
+    selectInput("type", "Type (OVA, TV, etc)", 
+                choices = type_type() %>% pull(type),
                 selected = NULL, multiple = TRUE)
-  }) 
+  })
   
+  available_genres <- reactive({
+    data <- filtered_data()
+    if(nrow(data) == 0) return(character(0))
+    genres <- unlist(strsplit(data$genres, ",\\s*"))
+    unique(genres[genres != ""])
+  })
   
-  # filter final data
+  output$genre_filter <- renderUI({
+    genres <- available_genres()
+    selectInput("genre_filter", "Filter by Genre", choices = genres, 
+                selected = NULL, multiple = TRUE)
+  })
+  
   filtered_data <- reactive({
     data_version()
-    
     if (!dbExistsTable(conn, "anime")) {
       return(data.frame(
         mal_id = integer(0),
@@ -205,43 +209,35 @@ server = function(input, output, session) {
         studios = character(0),
         producers = character(0),
         stringsAsFactors = FALSE
-      ))}
+      ))
+    }
     
-    
-    # Create structure for SQL query then use paste to connect them later
     base_query <- "SELECT * FROM anime"
     conditions <- c()
     params <- list()
-    
-    # Handle optional title search filter
     
     if (!is.null(input$search) && input$search != "") {
       conditions <- c(conditions, "LOWER(title) LIKE ?")
       params <- c(params, paste0("%", tolower(input$search), "%"))
     }
     
-    # Handle optional score filter
     if (!is.null(input$score) && length(input$score) == 2) {
       conditions <- c(conditions, "score BETWEEN ? AND ?")
       params <- c(params, input$score[1], input$score[2])
     }
     
-    # Handle optional rating filter
     if (!is.null(input$rating) && length(input$rating) > 0) {
       placeholder <- paste(rep("?", length(input$rating)), collapse = ", ")
       conditions <- c(conditions, paste0("rating IN (", placeholder, ")"))
       params <- c(params, input$rating)
     }
     
-    # Handle optional type filter
     if (!is.null(input$type) && length(input$type) > 0) {
       placeholder <- paste(rep("?", length(input$type)), collapse = ", ")
       conditions <- c(conditions, paste0("type IN (", placeholder, ")"))
       params <- c(params, input$type)
     }
     
-    
-    # Combine query
     if (length(conditions) > 0) {
       query <- paste(base_query, "WHERE", paste(conditions, collapse = " AND "))
     } else {
@@ -251,18 +247,36 @@ server = function(input, output, session) {
     dbGetQuery(conn, query, params = params)
   })
   
-  
-  
-  
-  
-  output$animeTable = DT::renderDataTable({
-    datatable(filtered_data(), options = list(searching = FALSE))
+  output$animeTable <- DT::renderDataTable({
+    orig_data <- filtered_data() %>% mutate(row_id = row_number())
+    
+    onehot <- orig_data %>%
+      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+      unnest(genres_list) %>%
+      mutate(dummy = 1) %>%
+      pivot_wider(id_cols = row_id, 
+                  names_from = genres_list, 
+                  values_from = dummy, 
+                  values_fill = list(dummy = 0))
+    
+    final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
+      select(-row_id) %>%
+      mutate(
+        fav_pct = ifelse(members > 0, favorites/members*100, NA),
+        scored_pct = ifelse(members > 0, scored_by/members*100, NA)
+      )
+    
+    if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
+      final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
+    }
+    
+    datatable(final_data, options = list(searching = FALSE))
   })
   
-  output$scatterPlot = renderPlotly({
-    data = filtered_data()
-    data = data[!is.na(data$score) & !is.na(data$members), ]
-    if (nrow(data) == 0) return(NULL)
+  output$scatterPlot <- renderPlotly({
+    data <- filtered_data()
+    data <- data[!is.na(data$score) & !is.na(data$members), ]
+    if(nrow(data) == 0) return(NULL)
     
     plot_ly(
       data,
@@ -284,7 +298,6 @@ server = function(input, output, session) {
         cmin = min(data$score, na.rm = TRUE),
         cmax = max(data$score, na.rm = TRUE),
         colorbar = list(title = "Score")
-        # Remove line property completely
       ),
       text = ~paste("Title:", title,
                     "<br>Score:", score,
@@ -300,22 +313,24 @@ server = function(input, output, session) {
       )
   })
   
-  output$bubblePlot = renderPlotly({
-    data = filtered_data()
-    data = data[!is.na(data$favorites) & !is.na(data$score) & !is.na(data$popularity), ]
-    if (nrow(data) == 0) return(NULL)
+  output$bubblePlot <- renderPlotly({
+    data <- filtered_data()
+    data <- data[!is.na(data$favorites) & !is.na(data$score) & !is.na(data$popularity), ]
+    if(nrow(data)==0) return(NULL)
     
-
-    p = plot_ly()
-    unique_genres = unique(data$genres)
-    genre_colors = colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(unique_genres))
+    all_genres <- unlist(strsplit(data$genres, ",\\s*"))
+    if(length(all_genres) == 0) return(NULL)
+    genre_freq <- sort(table(all_genres), decreasing = TRUE)
+    top10_genres <- names(genre_freq)[1:min(10, length(genre_freq))]
     
-    for (i in 1:length(unique_genres)) {
-      if (unique_genres[i] == "") next
-      
-      genre_data = data[data$genres == unique_genres[i], ]
-      if (nrow(genre_data) > 0) {
-        p = add_trace(p,
+    p <- plot_ly()
+    genre_colors <- colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(top10_genres))
+    
+    for(i in seq_along(top10_genres)) {
+      current_genre <- top10_genres[i]
+      genre_data <- data[grepl(paste0("\\b", current_genre, "\\b"), data$genres), ]
+      if(nrow(genre_data) > 0) {
+        p <- add_trace(p,
                        data = genre_data,
                        x = ~popularity,
                        y = ~score,
@@ -334,17 +349,123 @@ server = function(input, output, session) {
                                      "<br>Score:", score,
                                      "<br>Popularity:", popularity),
                        hoverinfo = "text",
-                       name = unique_genres[i]
+                       name = current_genre
         )
       }
     }
     p %>% layout(
-      title = "Favorites vs. Score & Popularity by Genre Combination",
+      title = "Favorites vs. Score & Popularity (Top 10 Genres)",
       xaxis = list(title = "Popularity", showgrid = TRUE, zeroline = FALSE),
       yaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
       plot_bgcolor = "rgba(240,240,240,0.95)",
       paper_bgcolor = "rgba(240,240,240,0.95)"
     )
+  })
+  
+  # NEW: Area Plot (Score vs. percentage metrics)
+  output$areaPlot <- renderPlotly({
+    data <- filtered_data()
+    # Ensure valid members and score values and avoid division by zero:
+    data <- data %>% filter(!is.na(score), !is.na(members), members > 0)
+    if(nrow(data) == 0) return(NULL)
+    
+    # Calculate percentages:
+    data <- data %>%
+      mutate(
+        fav_pct = favorites / members * 100,
+        scored_pct = scored_by / members * 100,
+        score_bin = round(score, 1)
+      )
+    
+    # Group by score bins:
+    area_data <- data %>%
+      group_by(score_bin) %>%
+      summarize(
+        avg_fav_pct = mean(fav_pct, na.rm = TRUE),
+        avg_scored_pct = mean(scored_pct, na.rm = TRUE)
+      ) %>%
+      arrange(score_bin)
+    
+    # Build area plot using plotly:
+    fig <- plot_ly(type = 'scatter', mode = 'none', fill = 'tozeroy')
+    fig <- fig %>% add_trace(
+      x = ~area_data$score_bin,
+      y = ~area_data$avg_fav_pct,
+      name = 'Favorite %',
+      fillcolor = 'rgba(168, 216, 234, 0.5)'
+    )
+    fig <- fig %>% add_trace(
+      x = ~area_data$score_bin,
+      y = ~area_data$avg_scored_pct,
+      name = 'Scored %',
+      fill = 'tozeroy',
+      fillcolor = 'rgba(255, 212, 96, 0.5)'
+    )
+    fig <- fig %>% layout(
+      xaxis = list(title = 'Score'),
+      yaxis = list(title = 'Percentage'),
+      title = list(text = "Score vs. Percentage Metrics", x = 0.5),
+      margin = list(t = 100)
+    )
+    fig
+  })
+  
+  output$polarBarChart <- renderPlotly({
+    data <- filtered_data()
+    data <- data[!is.na(data$score) & data$score > 0, ]
+    if(nrow(data)==0) return(NULL)
+    
+    expanded <- strsplit(data$genres, ",\\s*")
+    df_list <- lapply(seq_along(expanded), function(i) {
+      if(length(expanded[[i]]) == 0 || expanded[[i]][1] == "") return(NULL)
+      data.frame(
+        genre = expanded[[i]],
+        score = data$score[i],
+        stringsAsFactors = FALSE
+      )
+    })
+    merged_df <- do.call(rbind, df_list)
+    if(is.null(merged_df) || nrow(merged_df)==0) return(NULL)
+    
+    summary_df <- merged_df %>%
+      group_by(genre) %>%
+      summarize(
+        freq = n(),
+        avg_score = mean(score, na.rm = TRUE)
+      ) %>%
+      arrange(desc(freq))
+    
+    top15_df <- summary_df %>%
+      slice_head(n = 15) %>%
+      arrange(desc(avg_score))
+    
+    plot_ly(type = 'barpolar') %>%
+      add_trace(
+        r = top15_df$avg_score,
+        theta = top15_df$genre,
+        text = paste("Genre:", top15_df$genre,
+                     "<br>Avg Score:", round(top15_df$avg_score, 2),
+                     "<br>Frequency:", top15_df$freq),
+        hoverinfo = "text",
+        marker = list(
+          color = top15_df$avg_score,
+          colorscale = "RdPu",
+          cmin = min(top15_df$avg_score, na.rm = TRUE),
+          cmax = max(top15_df$avg_score, na.rm = TRUE)
+        )
+      ) %>%
+      layout(
+        title = list(text = "Top 15 Genres by Average Score (Radial Bar)", x = 0.5),
+        margin = list(t = 120),
+        polar = list(
+          radialaxis = list(
+            range = c(0, max(top15_df$avg_score, na.rm = TRUE) * 1.1),
+            visible = TRUE, showline = FALSE
+          ),
+          angularaxis = list(direction = "clockwise")
+        ),
+        showlegend = FALSE
+      )
   })
   
   onStop(function() {
@@ -353,4 +474,3 @@ server = function(input, output, session) {
 }
 
 shinyApp(ui = ui, server = server)
-
