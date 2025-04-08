@@ -10,6 +10,7 @@ library(plotly)
 library(ggplot2)
 library(shinythemes)
 library(tidyr)
+library(xgboost)
 
 conn <- dbConnect(SQLite(), "anime_database.sqlite")
 
@@ -134,15 +135,13 @@ ui <- fluidPage(
         tabPanel("Interactive Data Visualization", 
                  fluidRow(
                    column(12, plotlyOutput("scatterPlot")),
-                   column(12, plotlyOutput("bubblePlot"))
-                 ),
-                 fluidRow(
-                   column(12, plotlyOutput("polarBarChart"))
-                 ),
-                 fluidRow(
+                   column(12, plotlyOutput("polarBarChart")),
                    column(12, plotlyOutput("areaPlot"))
                  )
-        )
+        ),
+        tabPanel(
+                 "Recommendations", DT::dataTableOutput("recommendTable")
+                 )
       )
     )
   )
@@ -185,10 +184,14 @@ server <- function(input, output, session) {
   })
   
   available_genres <- reactive({
-    data <- filtered_data()
-    if(nrow(data) == 0) return(character(0))
-    genres <- unlist(strsplit(data$genres, ",\\s*"))
-    unique(genres[genres != ""])
+    query <- "
+    SELECT DISTINCT trim(json_each.value, '\"') AS genre
+    FROM anime,
+         json_each('[' || '\"' || replace(genres, ', ', '\",\"') || '\"' || ']')
+    WHERE genres <> ''
+  "
+    res <- dbGetQuery(conn, query)
+    if(nrow(res) > 0) res$genre else character(0)
   })
   
   output$genre_filter <- renderUI({
@@ -261,8 +264,8 @@ server <- function(input, output, session) {
     final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
       select(-row_id) %>%
       mutate(
-        fav_pct = ifelse(members > 0, favorites/members*100, NA),
-        scored_pct = ifelse(members > 0, scored_by/members*100, NA)
+        fav_pct = ifelse(members > 0, favorites / members * 100, NA),
+        scored_pct = ifelse(members > 0, scored_by / members * 100, NA)
       )
     if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
       final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
@@ -285,9 +288,9 @@ server <- function(input, output, session) {
         color = ~score,
         colorscale = list(
           c(0, "#F4F7F7"),
-          c(0.3, "#D5E5E5"), 
-          c(0.5, "#AACFD0"), 
-          c(0.7, "#79A8A9"), 
+          c(0.3, "#D5E5E5"),
+          c(0.5, "#AACFD0"),
+          c(0.7, "#79A8A9"),
           c(0.9, "#1F4E5F"),
           c(1, "#18230F")
         ),
@@ -303,52 +306,6 @@ server <- function(input, output, session) {
       title = "Score vs. Viewers",
       xaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
       yaxis = list(title = "Viewers", showgrid = TRUE, zeroline = FALSE),
-      plot_bgcolor = "rgba(240,240,240,0.95)",
-      paper_bgcolor = "rgba(240,240,240,0.95)"
-    )
-  })
-  
-  output$bubblePlot <- renderPlotly({
-    data <- filtered_data()
-    data <- data[!is.na(data$favorites) & !is.na(data$score) & !is.na(data$popularity), ]
-    if(nrow(data)==0) return(NULL)
-    all_genres <- unlist(strsplit(data$genres, ",\\s*"))
-    if(length(all_genres) == 0) return(NULL)
-    genre_freq <- sort(table(all_genres), decreasing = TRUE)
-    top10_genres <- names(genre_freq)[1:min(10, length(genre_freq))]
-    p <- plot_ly()
-    genre_colors <- colorRampPalette(RColorBrewer::brewer.pal(12, "Set3"))(length(top10_genres))
-    for(i in seq_along(top10_genres)) {
-      current_genre <- top10_genres[i]
-      genre_data <- data[grepl(paste0("\\b", current_genre, "\\b"), data$genres), ]
-      if(nrow(genre_data) > 0) {
-        p <- add_trace(p,
-                       data = genre_data,
-                       x = ~popularity,
-                       y = ~score,
-                       type = 'scatter',
-                       mode = 'markers',
-                       marker = list(
-                         size = ~sqrt(favorites)/10, 
-                         sizemode = 'area',
-                         opacity = 0.7,
-                         color = genre_colors[i],
-                         line = list(width = 1, color = 'black')
-                       ),
-                       text = ~paste("Title:", title,
-                                     "<br>Genres:", genres,
-                                     "<br>Favorites:", favorites,
-                                     "<br>Score:", score,
-                                     "<br>Popularity:", popularity),
-                       hoverinfo = "text",
-                       name = current_genre
-        )
-      }
-    }
-    p %>% layout(
-      title = "Favorites vs. Score & Popularity (Top 10 Genres)",
-      xaxis = list(title = "Popularity", showgrid = TRUE, zeroline = FALSE),
-      yaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
       plot_bgcolor = "rgba(240,240,240,0.95)",
       paper_bgcolor = "rgba(240,240,240,0.95)"
     )
@@ -397,7 +354,7 @@ server <- function(input, output, session) {
   output$polarBarChart <- renderPlotly({
     data <- filtered_data()
     data <- data[!is.na(data$score) & data$score > 0, ]
-    if(nrow(data)==0) return(NULL)
+    if(nrow(data) == 0) return(NULL)
     expanded <- strsplit(data$genres, ",\\s*")
     df_list <- lapply(seq_along(expanded), function(i) {
       if(length(expanded[[i]]) == 0 || expanded[[i]][1] == "") return(NULL)
@@ -408,7 +365,7 @@ server <- function(input, output, session) {
       )
     })
     merged_df <- do.call(rbind, df_list)
-    if(is.null(merged_df) || nrow(merged_df)==0) return(NULL)
+    if(is.null(merged_df) || nrow(merged_df) == 0) return(NULL)
     summary_df <- merged_df %>%
       group_by(genre) %>%
       summarize(
@@ -448,8 +405,49 @@ server <- function(input, output, session) {
       )
   })
   
-  onStop(function() {
-    dbDisconnect(conn)
+  output$recommendTable <- DT::renderDataTable({
+    orig_data <- filtered_data() %>% 
+      filter(!is.na(score)) %>%
+      mutate(row_id = row_number())
+
+    onehot <- orig_data %>%
+      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+      unnest(genres_list) %>%
+      mutate(dummy = 1) %>%
+      pivot_wider(id_cols = row_id, 
+                  names_from = genres_list, 
+                  values_from = dummy, 
+                  values_fill = list(dummy = 0))
+
+    final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
+      select(-row_id) %>%
+      mutate(
+        fav_pct = ifelse(members > 0, favorites/members*100, NA),
+        scored_pct = ifelse(members > 0, scored_by/members*100, NA)
+      )
+    
+    if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
+      final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
+    }
+
+    genre_cols <- setdiff(colnames(onehot), "row_id")
+    X <- as.matrix(final_data[, genre_cols])
+    y <- final_data$score
+    dtrain <- xgb.DMatrix(data = X, label = y)
+    params <- list(objective = "reg:squarederror", eval_metric = "rmse", eta = 0.1, max_depth = 6)
+        
+    xgb_model <- xgb.train(
+      params = params,
+      data = dtrain,
+      nrounds = 50,
+      verbose = 0, 
+      gamma = 1
+      )
+    final_data$recommendation_score <- predict(xgb_model, X)
+    final_data <- final_data %>% 
+      arrange(desc(recommendation_score)) %>%
+      head(50)
+    datatable(final_data, options = list(searching = FALSE))
   })
 }
 
