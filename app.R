@@ -140,8 +140,8 @@ ui <- fluidPage(
                  )
         ),
         tabPanel(
-                 "Recommendations", DT::dataTableOutput("recommendTable")
-                 )
+          "Recommendations", DT::dataTableOutput("recommendTable")
+        )
       )
     )
   )
@@ -409,46 +409,49 @@ server <- function(input, output, session) {
     orig_data <- filtered_data() %>% 
       filter(!is.na(score)) %>%
       mutate(row_id = row_number())
-
+    
     onehot <- orig_data %>%
       mutate(genres_list = strsplit(genres, ",\\s*")) %>%
-      unnest(genres_list) %>%
+      unnest(genres_list, keep_empty = TRUE) %>%
       mutate(dummy = 1) %>%
       pivot_wider(id_cols = row_id, 
                   names_from = genres_list, 
                   values_from = dummy, 
                   values_fill = list(dummy = 0))
-
+    
     final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
       select(-row_id) %>%
       mutate(
         fav_pct = ifelse(members > 0, favorites/members*100, NA),
         scored_pct = ifelse(members > 0, scored_by/members*100, NA)
-      )
+      ) %>%
+      distinct(mal_id, .keep_all = TRUE)  
     
     if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
       final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
     }
-
+    
     genre_cols <- setdiff(colnames(onehot), "row_id")
     X <- as.matrix(final_data[, genre_cols])
     y <- final_data$score
     dtrain <- xgb.DMatrix(data = X, label = y)
     params <- list(objective = "reg:squarederror", eval_metric = "rmse", eta = 0.1, max_depth = 6)
-        
+    
     xgb_model <- xgb.train(
       params = params,
       data = dtrain,
       nrounds = 50,
       verbose = 0, 
       gamma = 1
-      )
+    )
+    
     final_data$recommendation_score <- predict(xgb_model, X)
     final_data <- final_data %>% 
       arrange(desc(recommendation_score)) %>%
       head(50)
     datatable(final_data, options = list(searching = FALSE))
   })
+  
 }
 
 shinyApp(ui = ui, server = server)
