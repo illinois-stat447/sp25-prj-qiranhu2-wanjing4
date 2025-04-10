@@ -115,6 +115,26 @@ fetch_data <- function(pages) {
 ui <- fluidPage(
   fluidPage(theme = shinytheme("united")),
   useShinyjs(),
+  # Custom CSS for  styled card look
+  tags$head(
+    tags$style(HTML("
+      .summary-card {
+        cursor: pointer;
+        transition: transform 0.2s;
+        padding: 20px;
+        border-radius: 10px;
+        background: #1DB954;
+        color: white;
+        text-align: center;
+        margin: 10px;
+        box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      }
+      .summary-card:hover {
+        transform: scale(1.05);
+      }
+    "))
+  ),
   titlePanel("Anime Data Fetcher"),
   sidebarLayout(
     sidebarPanel(
@@ -139,8 +159,22 @@ ui <- fluidPage(
                    column(12, plotlyOutput("areaPlot"))
                  )
         ),
-        tabPanel(
-          "Recommendations", DT::dataTableOutput("recommendTable")
+        tabPanel("Recommendations", DT::dataTableOutput("recommendTable")),
+        tabPanel("Summary",
+                 # First row of summary cards
+                 fluidRow(
+                   column(3, uiOutput("card_total_ui")),
+                   column(3, uiOutput("card_avgScore_ui")),
+                   column(3, uiOutput("card_avgMembers_ui")),
+                   column(3, uiOutput("card_avgFavorites_ui"))
+                 ),
+                 # Second row of additional cards
+                 fluidRow(
+                   column(3, uiOutput("card_medianScore_ui")),
+                   column(3, uiOutput("card_maxScore_ui")),
+                   column(3, uiOutput("card_minScore_ui")),
+                   column(3, uiOutput("card_avgEpisodes_ui"))
+                 )
         )
       )
     )
@@ -148,6 +182,7 @@ ui <- fluidPage(
 )
 
 server <- function(input, output, session) {
+  
   data_version <- reactiveVal(0)
   
   observeEvent(input$fetch_show, {
@@ -450,6 +485,222 @@ server <- function(input, output, session) {
       arrange(desc(recommendation_score)) %>%
       head(50)
     datatable(final_data, options = list(searching = FALSE))
+  })
+  
+  summary_details <- reactive({
+    df <- filtered_data()
+    total <- nrow(df)
+    avgScore <- if(total > 0) round(mean(df$score, na.rm = TRUE), 2) else NA
+    avgMembers <- if(total > 0) round(mean(df$members, na.rm = TRUE), 0) else NA
+    avgFavorites <- if(total > 0) round(mean(df$favorites, na.rm = TRUE), 0) else NA
+    medianScore <- if(total > 0) round(median(df$score, na.rm = TRUE), 2) else NA
+    maxScore <- if(total > 0) round(max(df$score, na.rm = TRUE), 2) else NA
+    minScore <- if(total > 0) round(min(df$score, na.rm = TRUE), 2) else NA
+    avgEpisodes <- if(total > 0) round(mean(df$episodes, na.rm = TRUE), 0) else NA
+    list(total = total, avgScore = avgScore, avgMembers = avgMembers, avgFavorites = avgFavorites,
+         medianScore = medianScore, maxScore = maxScore, minScore = minScore, avgEpisodes = avgEpisodes)
+  })
+  
+  ## UI outputs for Spotify styled summary cards (each is clickable)
+  output$card_total_ui <- renderUI({
+    actionLink("card_total", 
+               div(class = "summary-card",
+                   h4("Total Anime"),
+                   h3(summary_details()$total)
+               )
+    )
+  })
+  
+  output$card_avgScore_ui <- renderUI({
+    actionLink("card_avgScore", 
+               div(class = "summary-card",
+                   h4("Average Score"),
+                   h3(summary_details()$avgScore)
+               )
+    )
+  })
+  
+  output$card_avgMembers_ui <- renderUI({
+    actionLink("card_avgMembers", 
+               div(class = "summary-card",
+                   h4("Average Members"),
+                   h3(summary_details()$avgMembers)
+               )
+    )
+  })
+  
+  output$card_avgFavorites_ui <- renderUI({
+    actionLink("card_avgFavorites", 
+               div(class = "summary-card",
+                   h4("Average Favorites"),
+                   h3(summary_details()$avgFavorites)
+               )
+    )
+  })
+  
+  output$card_medianScore_ui <- renderUI({
+    actionLink("card_medianScore", 
+               div(class = "summary-card",
+                   h4("Median Score"),
+                   h3(summary_details()$medianScore)
+               )
+    )
+  })
+  
+  output$card_maxScore_ui <- renderUI({
+    actionLink("card_maxScore", 
+               div(class = "summary-card",
+                   h4("Max Score"),
+                   h3(summary_details()$maxScore)
+               )
+    )
+  })
+  
+  output$card_minScore_ui <- renderUI({
+    actionLink("card_minScore", 
+               div(class = "summary-card",
+                   h4("Min Score"),
+                   h3(summary_details()$minScore)
+               )
+    )
+  })
+  
+  output$card_avgEpisodes_ui <- renderUI({
+    actionLink("card_avgEpisodes", 
+               div(class = "summary-card",
+                   h4("Average Episodes"),
+                   h3(summary_details()$avgEpisodes)
+               )
+    )
+  })
+  
+  observeEvent(input$card_total, {
+    showModal(modalDialog(
+      title = "Detailed Information: Total Anime",
+      DT::dataTableOutput("modal_totalTable"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  output$modal_totalTable <- DT::renderDataTable({
+    df <- filtered_data()
+    if(nrow(df) > 0) {
+      df[, c("title", "score", "members", "favorites")]
+    } else {
+      data.frame(Message = "No data available.")
+    }
+  })
+  
+  observeEvent(input$card_avgScore, {
+    showModal(modalDialog(
+      title = "Detailed Information: Score Distribution",
+      plotlyOutput("modal_avgScorePlot"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  output$modal_avgScorePlot <- renderPlotly({
+    df <- filtered_data()
+    df <- df[!is.na(df$score), ]
+    p <- ggplot(df, aes(x = score)) + 
+      geom_histogram(binwidth = 0.5, fill = "#1DB954", color = "white") +
+      labs(title = "Score Distribution", x = "Score", y = "Count")
+    ggplotly(p)
+  })
+  
+  
+  observeEvent(input$card_avgMembers, {
+    showModal(modalDialog(
+      title = "Detailed Information: Members Distribution",
+      plotlyOutput("modal_avgMembersPlot"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  output$modal_avgMembersPlot <- renderPlotly({
+    df <- filtered_data()
+    df <- df[!is.na(df$members), ]
+    p <- ggplot(df, aes(x = members)) + 
+      geom_histogram(binwidth = 1000, fill = "#1DB954", color = "white") +
+      labs(title = "Members Distribution", x = "Members", y = "Count")
+    ggplotly(p)
+  })
+  
+  observeEvent(input$card_avgFavorites, {
+    showModal(modalDialog(
+      title = "Detailed Information: Favorites Distribution",
+      plotlyOutput("modal_avgFavoritesPlot"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  output$modal_avgFavoritesPlot <- renderPlotly({
+    df <- filtered_data()
+    df <- df[!is.na(df$favorites), ]
+    p <- ggplot(df, aes(x = favorites)) + 
+      geom_histogram(binwidth = 10, fill = "#1DB954", color = "white") +
+      labs(title = "Favorites Distribution", x = "Favorites", y = "Count")
+    ggplotly(p)
+  })
+  
+  observeEvent(input$card_medianScore, {
+    showModal(modalDialog(
+      title = "Detailed Information: Score Statistics",
+      verbatimTextOutput("modal_scoreStats"),
+      easyClose = TRUE,
+      size = "m"
+    ))
+  })
+  output$modal_scoreStats <- renderPrint({
+    df <- filtered_data()
+    summary(df$score)
+  })
+  
+  observeEvent(input$card_maxScore, {
+    showModal(modalDialog(
+      title = "Detailed Information: Highest Scoring Anime",
+      DT::dataTableOutput("modal_maxScoreTable"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  output$modal_maxScoreTable <- DT::renderDataTable({
+    df <- filtered_data()
+    df <- df[!is.na(df$score), ]
+    head(df[order(-df$score), c("title", "score", "members", "favorites")], 10)
+  })
+  
+  observeEvent(input$card_minScore, {
+    showModal(modalDialog(
+      title = "Detailed Information: Lowest Scoring Anime",
+      DT::dataTableOutput("modal_minScoreTable"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  
+  output$modal_minScoreTable <- DT::renderDataTable({
+    df <- filtered_data()
+    df <- df[!is.na(df$score), ]
+    head(df[order(df$score), c("title", "score", "members", "favorites")], 10)
+  })
+  
+  observeEvent(input$card_avgEpisodes, {
+    showModal(modalDialog(
+      title = "Detailed Information: Episodes Distribution",
+      plotlyOutput("modal_avgEpisodesPlot"),
+      easyClose = TRUE,
+      size = "l"
+    ))
+  })
+  
+  output$modal_avgEpisodesPlot <- renderPlotly({
+    df <- filtered_data()
+    df <- df[!is.na(df$episodes), ]
+    p <- ggplot(df, aes(x = episodes)) + 
+      geom_histogram(binwidth = 1, fill = "#1DB954", color = "white") +
+      labs(title = "Episodes Distribution", x = "Episodes", y = "Count")
+    ggplotly(p)
   })
   
 }
