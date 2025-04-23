@@ -40,18 +40,29 @@ fetch_data <- function(pages) {
     }
     init_data <- fromJSON(content(init_resp, "text", encoding = "UTF-8"))
     last_page <- init_data$pagination$last_visible_page
+    
     start_page <- last_page
     end_page <- max(1, last_page - pages + 1)
+    
     genres_df <- fetch_genres()
+    
     all_anime_df <- data.frame()
+    
     for (page in start_page:end_page) {
       tryCatch({
         url <- paste0("https://api.jikan.moe/v4/anime?page=", page)
         response <- GET(url)
+        
         if (status_code(response) == 200) {
           data <- content(response, "text", encoding = "UTF-8")
-          anime_data_json <- fromJSON(data)$data
-          if (!is.null(anime_data_json) && nrow(anime_data_json) > 0) {
+          parsed_data <- fromJSON(data)
+          
+          if (!is.null(parsed_data$data) &&
+              is.data.frame(parsed_data$data) &&
+              nrow(parsed_data$data) > 0) {
+            
+            anime_data_json <- parsed_data$data
+            
             genres_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
               genres_list <- anime_data_json$genres[[i]]
               if (is.null(genres_list) || length(genres_list) == 0) {
@@ -60,6 +71,7 @@ fetch_data <- function(pages) {
                 return(paste(genres_list$name, collapse = ", "))
               }
             })
+            
             studios_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
               studios_list <- anime_data_json$studios[[i]]
               if (is.null(studios_list) || length(studios_list) == 0) {
@@ -68,6 +80,7 @@ fetch_data <- function(pages) {
                 return(paste(studios_list$name, collapse = ", "))
               }
             })
+            
             producers_vec <- sapply(seq_len(nrow(anime_data_json)), function(i) {
               producers_list <- anime_data_json$producers[[i]]
               if (is.null(producers_list) || length(producers_list) == 0) {
@@ -76,6 +89,7 @@ fetch_data <- function(pages) {
                 return(paste(producers_list$name, collapse = ", "))
               }
             })
+            
             anime_df <- data.frame(
               mal_id = anime_data_json$mal_id,
               title = anime_data_json$title,
@@ -94,15 +108,24 @@ fetch_data <- function(pages) {
               producers = producers_vec,
               stringsAsFactors = FALSE
             )
+            
             all_anime_df <- rbind(all_anime_df, anime_df)
+            
+          } else {
+            message("Skipping page ", page, ": no valid data or empty data frame returned.")
           }
+          
+        } else {
+          message("Skipping page ", page, ": status code ", status_code(response))
         }
       }, error = function(e) {
         print(paste("Error fetching page", page, ":", e$message))
       })
+      
       Sys.sleep(1)
       incProgress(1 / pages)
     }
+    
     if (nrow(all_anime_df) > 0) {
       if (dbExistsTable(conn, "anime")) {
         dbExecute(conn, "DROP TABLE anime")
@@ -112,10 +135,10 @@ fetch_data <- function(pages) {
   })
 }
 
+
 ui <- fluidPage(
-  fluidPage(theme = shinytheme("united")),
+  theme = shinytheme("united"),
   useShinyjs(),
-  # Custom CSS for  styled card look
   tags$head(
     tags$style(HTML("
       .summary-card {
@@ -123,7 +146,7 @@ ui <- fluidPage(
         transition: transform 0.2s;
         padding: 20px;
         border-radius: 10px;
-        background: #1DB954;
+        background: #1DB954; 
         color: white;
         text-align: center;
         margin: 10px;
@@ -136,39 +159,61 @@ ui <- fluidPage(
     "))
   ),
   titlePanel("Anime Data Fetcher"),
+  
   sidebarLayout(
     sidebarPanel(
       numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
-      div(id = "filter_inputs",
-          textInput("search", "Search by title:", placeholder = "Enter title keywords"),
-          sliderInput("score", "Score (0 to 10)", min = 0, max = 10, step = 0.1, value = c(0, 10)),
-          uiOutput("rating"),
-          uiOutput("type"),
-          uiOutput("genre_filter")
+      div(
+        id = "filter_inputs",
+        textInput("search", "Search by title:"),
+        sliderInput("score", "Score (0–10)", min = 0, max = 10, value = c(0, 10)),
+        uiOutput("rating"),
+        uiOutput("type"),
+        uiOutput("genre_filter")
       ),
       actionButton("reset_filters", "Reset Filters")
     ),
+    
     mainPanel(
       tabsetPanel(
-        tabPanel("Data Table", DT::dataTableOutput("animeTable")),
-        tabPanel("Interactive Data Visualization", 
+        tabPanel("Anime Information",
+                 DT::dataTableOutput("animeTable")
+        ),
+        
+        tabPanel("Interactive Data Visualization",
                  fluidRow(
                    column(12, plotlyOutput("scatterPlot")),
-                   column(12, plotlyOutput("polarBarChart")),
-                   column(12, plotlyOutput("areaPlot"))
+                   column(12, plotlyOutput("areaPlot")),
+                   column(12, plotlyOutput("polarBarChart"))
                  )
         ),
-        tabPanel("Recommendations", DT::dataTableOutput("recommendTable")),
-        tabPanel("Summary",
-                 # First row of summary cards
+        
+        tabPanel("Explore New Animes Based On Your Preference",
+                 DT::dataTableOutput("recommendTable")
+        ),
+        
+        tabPanel("Your Anime Highlights",
+                 h3("Your Stats at a Glance"),
+                 uiOutput("wrapped_overviewUI"),
+                 
+                 h3("Your Top 5 Anime Based On Their Scores"),
+                 DT::dataTableOutput("topAnimeScoreTable"),
+                 
+                 h3("Your Favorite Genres"),
+                 plotlyOutput("topGenresPlot"),
+                 
+                 h3("Your Favorite Studios"),
+                 plotlyOutput("topStudiosPlot"),
+                 
+                 hr(),
+                 
                  fluidRow(
                    column(3, uiOutput("card_total_ui")),
                    column(3, uiOutput("card_avgScore_ui")),
                    column(3, uiOutput("card_avgMembers_ui")),
                    column(3, uiOutput("card_avgFavorites_ui"))
                  ),
-                 # Second row of additional cards
                  fluidRow(
                    column(3, uiOutput("card_medianScore_ui")),
                    column(3, uiOutput("card_maxScore_ui")),
@@ -181,8 +226,8 @@ ui <- fluidPage(
   )
 )
 
+
 server <- function(input, output, session) {
-  
   data_version <- reactiveVal(0)
   
   observeEvent(input$fetch_show, {
@@ -305,7 +350,31 @@ server <- function(input, output, session) {
     if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
       final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
     }
-    datatable(final_data, options = list(searching = FALSE))
+    
+    final_data <- final_data %>% 
+      select(title, type, episodes, status, rating, rank, popularity,
+             members, score, scored_by, scored_pct, favorites, fav_pct, genres, studios, producers, mal_id) %>%
+      rename(
+        "Anime Title" = title,
+        "Anime Type" = type,
+        "Episodes" = episodes,
+        "Release Status" = status,
+        "Anime Rating" = rating,
+        "Anime Rank" = rank,
+        "Anime Popularity"  = popularity,
+        "Viewers"   = members,
+        "Anime Score" = score,
+        "Viewers Who Scored" = scored_by,
+        "Scored Percentage" = scored_pct,
+        "Favorites" = favorites,
+        "Favorited Rate"      = fav_pct,
+        "Genres"              = genres,
+        "Studios"             = studios,
+        "Producers"           = producers,
+        "Anime ID"            = mal_id
+      )
+    
+    DT::datatable(final_data, options = list(searching = FALSE))
   })
   
   output$scatterPlot <- renderPlotly({
@@ -338,11 +407,11 @@ server <- function(input, output, session) {
                     "<br>Viewers:", members),
       hoverinfo = "text"
     ) %>% layout(
-      title = "Score vs. Viewers",
-      xaxis = list(title = "Score", showgrid = TRUE, zeroline = FALSE),
-      yaxis = list(title = "Viewers", showgrid = TRUE, zeroline = FALSE),
-      plot_bgcolor = "rgba(240,240,240,0.95)",
-      paper_bgcolor = "rgba(240,240,240,0.95)"
+      title = "Relationship between Anime Score and Number of Viewers",
+      xaxis = list(title = "Anime Score", showgrid = TRUE, zeroline = FALSE),
+      yaxis = list(title = "Number of Viewers", showgrid = TRUE, zeroline = FALSE),
+      plot_bgcolor = "white",
+      paper_bgcolor = "white"
     )
   })
   
@@ -363,24 +432,32 @@ server <- function(input, output, session) {
         avg_scored_pct = mean(scored_pct, na.rm = TRUE)
       ) %>%
       arrange(score_bin)
-    fig <- plot_ly(type = 'scatter', mode = 'none', fill = 'tozeroy')
+    fig <- plot_ly(type = "scatter", mode = "none", fill = "tozeroy")
+    
     fig <- fig %>% add_trace(
-      x = ~area_data$score_bin,
-      y = ~area_data$avg_fav_pct,
-      name = 'Favorite %',
-      fillcolor = 'rgba(168, 216, 234, 0.5)'
+      x          = ~area_data$score_bin,
+      y          = ~area_data$avg_fav_pct,
+      name       = "Favorited Rated",   
+      fillcolor  = "rgba(168,216,234,0.5)"
     )
+    
     fig <- fig %>% add_trace(
-      x = ~area_data$score_bin,
-      y = ~area_data$avg_scored_pct,
-      name = 'Scored %',
-      fill = 'tozeroy',
-      fillcolor = 'rgba(255, 212, 96, 0.5)'
+      x          = ~area_data$score_bin,
+      y          = ~area_data$avg_scored_pct,
+      name       = "Scored Rate",        
+      fill       = "tozeroy",
+      fillcolor  = "rgba(255,212,96,0.5)"
     )
+    
     fig <- fig %>% layout(
-      xaxis = list(title = 'Score'),
-      yaxis = list(title = 'Percentage'),
-      title = list(text = "Score vs. Percentage Metrics", x = 0.5),
+      title  = list(
+        text  = "Engagement Proportions by Anime User Score", 
+        x     = 0.5,
+        xanchor = "center"
+      ),
+      xaxis  = list(title = "Anime Score"),
+      yaxis  = list(title = "Engagement Proportion (%)"),
+      legend = list(title = list(text = "Metric")),           
       margin = list(t = 100)
     )
     fig
@@ -427,14 +504,18 @@ server <- function(input, output, session) {
         )
       ) %>%
       layout(
-        title = list(text = "Top 15 Genres by Average Score (Radial Bar)", x = 0.5),
-        margin = list(t = 120),
-        polar = list(
-          radialaxis = list(
-            range = c(0, max(top15_df$avg_score, na.rm = TRUE) * 1.1),
-            visible = TRUE, showline = FALSE
-          ),
-          angularaxis = list(direction = "clockwise")
+        title  = list(text = "Average Scores of the 15 Most Frequent Anime Genres",
+                      x = 0.5,      
+                      xanchor = "center"),
+        margin = list(t = 100,              
+                      l = 80, r = 80, b = 80),
+        polar  = list(
+          domain      = list(x = c(0, 1), y = c(0, 1)),  
+          radialaxis  = list(range = c(0,
+                                       max(top15_df$avg_score, na.rm = TRUE) * 1.2),
+                             visible = TRUE, showline = FALSE),
+          angularaxis = list(direction = "clockwise",
+                             rotation  = 90)  
         ),
         showlegend = FALSE
       )
@@ -460,7 +541,7 @@ server <- function(input, output, session) {
         fav_pct = ifelse(members > 0, favorites/members*100, NA),
         scored_pct = ifelse(members > 0, scored_by/members*100, NA)
       ) %>%
-      distinct(mal_id, .keep_all = TRUE)  
+      distinct(mal_id, .keep_all = TRUE)
     
     if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
       final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
@@ -481,12 +562,37 @@ server <- function(input, output, session) {
     )
     
     final_data$recommendation_score <- predict(xgb_model, X)
+    
     final_data <- final_data %>% 
       arrange(desc(recommendation_score)) %>%
-      head(50)
+      head(50) %>%
+      select(title, type, episodes, status, rating, rank, popularity,
+             members, score, scored_by, scored_pct, favorites, fav_pct, genres, studios, producers, mal_id, everything()) %>%
+      rename(
+        "Anime Title" = title,
+        "Anime Type" = type,
+        "Episodes" = episodes,
+        "Release Status" = status,
+        "Anime Rating" = rating,
+        "Anime Rank" = rank,
+        "Anime Popularity" = popularity,
+        "Viewers" = members,
+        "Anime Score" = score,
+        "Viewers Who Scored" = scored_by,
+        "Scored Rate" = scored_pct,
+        "Favorites" = favorites,
+        "Favorited Rate" = fav_pct,
+        "Genres" = genres,
+        "Studios" = studios,
+        "Producers" = producers,
+        "Anime ID" = mal_id,
+        "Recommendation Score" = recommendation_score
+      )
+    
     datatable(final_data, options = list(searching = FALSE))
   })
   
+  # REACTIVE SUMMARY
   summary_details <- reactive({
     df <- filtered_data()
     total <- nrow(df)
@@ -501,7 +607,7 @@ server <- function(input, output, session) {
          medianScore = medianScore, maxScore = maxScore, minScore = minScore, avgEpisodes = avgEpisodes)
   })
   
-  ## UI outputs for Spotify styled summary cards (each is clickable)
+  # SUMMARY CARDS (unchanged)
   output$card_total_ui <- renderUI({
     actionLink("card_total", 
                div(class = "summary-card",
@@ -574,6 +680,7 @@ server <- function(input, output, session) {
     )
   })
   
+  # CARD MODALS (unchanged)
   observeEvent(input$card_total, {
     showModal(modalDialog(
       title = "Detailed Information: Total Anime",
@@ -607,7 +714,6 @@ server <- function(input, output, session) {
       labs(title = "Score Distribution", x = "Score", y = "Count")
     ggplotly(p)
   })
-  
   
   observeEvent(input$card_avgMembers, {
     showModal(modalDialog(
@@ -678,7 +784,6 @@ server <- function(input, output, session) {
       size = "l"
     ))
   })
-  
   output$modal_minScoreTable <- DT::renderDataTable({
     df <- filtered_data()
     df <- df[!is.na(df$score), ]
@@ -693,7 +798,6 @@ server <- function(input, output, session) {
       size = "l"
     ))
   })
-  
   output$modal_avgEpisodesPlot <- renderPlotly({
     df <- filtered_data()
     df <- df[!is.na(df$episodes), ]
@@ -703,6 +807,144 @@ server <- function(input, output, session) {
     ggplotly(p)
   })
   
-}
+  wrapped_data <- reactive({
+    df <- filtered_data()
+    df$score <- as.numeric(df$score)
+    df$members <- as.numeric(df$members)
+    df$favorites <- as.numeric(df$favorites)
+    df$episodes <- as.numeric(df$episodes)
+    df
 
+  })
+  
+  output$wrapped_overviewUI <- renderUI({
+    df <- wrapped_data()
+    if (is.null(df) || nrow(df) == 0) {
+      return(h4("No anime in your current filter!"))
+    }
+    
+    total_anime <- nrow(df)
+    mean_score <- round(mean(df$score, na.rm = TRUE), 2)
+    genre_vec <- df$genres[!is.na(df$genres) & df$genres != ""]
+    genre_list <- strsplit(genre_vec, ",\\s*")
+    distinct_genres <- length(unique(unlist(genre_list)))
+    top_score <- round(max(df$score, na.rm = TRUE), 2)
+    longest_series <- max(df$episodes, na.rm = TRUE)
+    expanded <- df %>%
+      filter(!is.na(genres) & genres != "") %>%
+      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+      unnest(cols = c(genres_list))
+      topGenre <- expanded %>%
+      group_by(genres_list) %>%
+      tally(sort = TRUE) %>%
+      slice_head(n=1) %>%
+      pull(genres_list)
+    if(is.na(topGenre)) {
+      topGenre <- "Various"
+    }
+      
+    tagList(
+      p(paste("You’ve explored", total_anime,
+              "accross", distinct_genres, "different genres")),
+      p(paste("Your animes achieve an average score of ", mean_score)),
+      p(paste("Your highest rated anime is",
+              top_score, ". Excellent taste!")),
+      p(paste("And let’s not forget the", longest_series,
+              "episodes in a single series that you watched")),
+      p(paste("You are a huge fan of ", topGenre, 
+              "! Let's explore more animes based on your preference through our recommendation tab"))
+    )
+  })
+  
+  
+  output$topAnimeScoreTable <- DT::renderDataTable({
+    df <- wrapped_data()
+    if(nrow(df) == 0) return(data.frame(Message = "No data available."))
+    
+    df <- df[!is.na(df$score), ]
+    top5 <- head(df[order(-df$score), ], 5)
+    
+    top5 <- top5 %>%
+      select(title, score, members, favorites, genres) %>%
+      rename(
+        "Anime Title" = title,
+        "Anime Score" = score,
+        "Viewers"     = members,
+        "Favorites"   = favorites,
+        "Genres"      = genres
+      )
+    
+    DT::datatable(top5, options = list(searching = FALSE, paging = FALSE))
+  })
+  
+  output$topGenresPlot <- renderPlotly({
+    df <- wrapped_data()
+    if(nrow(df) == 0) return(NULL)
+    
+    expanded <- df %>%
+      filter(!is.na(genres) & genres != "") %>%
+      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+      unnest(cols = c(genres_list))
+    
+    genre_count <- expanded %>%
+      group_by(genres_list) %>%
+      summarize(count = n()) %>%
+      arrange(desc(count)) %>%
+      head(10)
+    
+    p <- ggplot(genre_count, aes(x = reorder(genres_list, count), y = count, fill = genres_list)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = count), hjust = -0.1, size = 3.5, fontface = "bold") +
+      coord_flip() +
+      scale_fill_viridis_d(option = "D") +
+      labs(
+        title = "Your Top 10 Anime Genres",
+        x = "Genres",
+        y = "Total Appearances"
+      ) +
+      theme_minimal(base_size = 13) +
+      theme(
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major.y = element_blank()
+      )
+    
+    ggplotly(p)
+  })
+  
+  output$topStudiosPlot <- renderPlotly({
+    df <- wrapped_data()
+    if(nrow(df) == 0) return(NULL)
+    
+    expanded <- df %>%
+      filter(!is.na(studios) & studios != "") %>%
+      mutate(studios_list = strsplit(studios, ",\\s*")) %>%
+      unnest(cols = c(studios_list))
+    
+    studio_count <- expanded %>%
+      group_by(studios_list) %>%
+      summarize(count = n()) %>%
+      arrange(desc(count)) %>%
+      head(10)
+    
+    p <- ggplot(studio_count, aes(x = reorder(studios_list, count), y = count, fill = studios_list)) +
+      geom_bar(stat = "identity", show.legend = FALSE) +
+      geom_text(aes(label = count), hjust = -0.1, size = 3.5, fontface = "bold") +
+      coord_flip() +
+      scale_fill_viridis_d(option = "C") +
+      labs(
+        title = "Your Top 10 Anime Studios",
+        x = "Studios",
+        y = "Total Appearances"
+      ) +
+      theme_minimal(base_size = 13) +
+      theme(
+        plot.title = element_text(face = "bold", hjust = 0.5),
+        axis.title = element_text(face = "bold"),
+        panel.grid.major.y = element_blank()
+      )
+    
+    ggplotly(p)
+  })
+}
 shinyApp(ui = ui, server = server)
