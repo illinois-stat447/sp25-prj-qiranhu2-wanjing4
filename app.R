@@ -185,7 +185,8 @@ ui <- fluidPage(
                  fluidRow(
                    column(12, plotlyOutput("scatterPlot")),
                    column(12, plotlyOutput("areaPlot")),
-                   column(12, plotlyOutput("polarBarChart"))
+                   column(12, plotlyOutput("polarBarChart")),
+                   column(12, plotlyOutput("studioBar"))
                  )
         ),
         
@@ -521,6 +522,66 @@ server <- function(input, output, session) {
       )
   })
   
+  output$studioBar <- renderPlotly({
+    
+    d <- filtered_data() |>
+      filter(!is.na(score))
+    
+    if (nrow(d) == 0) return(NULL)
+    
+    studio_vec <- strsplit(d$studios, ",\\s*")
+    df_list <- lapply(seq_along(studio_vec), function(i) {
+      if (length(studio_vec[[i]]) == 0 || studio_vec[[i]][1] == "") return(NULL)
+      data.frame(
+        studio = studio_vec[[i]],
+        score  = d$score[i],
+        stringsAsFactors = FALSE
+      )
+    })
+    d_expanded <- do.call(rbind, df_list)
+    
+    stats <- d_expanded |>
+      group_by(studio) |>
+      summarise(
+        avg_score = mean(score),
+        n_titles  = n(),
+        .groups   = "drop"
+      ) |>
+      arrange(desc(avg_score)) |>
+      slice_head(n = 15)
+    
+    plot_ly(
+      stats,
+      x = ~avg_score,
+      y = ~reorder(studio, avg_score),
+      type = "bar",
+      orientation = "h",
+      marker = list(
+        color      = ~(avg_score),
+        colorscale = "Portland", 
+        reversescale = TRUE, 
+        cmin       = min(stats$avg_score),
+        cmax       = max(stats$avg_score),
+        colorbar   = list(title = "Average Scores")
+      ),
+      text = ~paste0(
+        "<b>", studio, "</b>",
+        "<br>Average Score: ", round(avg_score, 2),
+        "<br>Number Of Titles: ", n_titles
+      ),
+      hoverinfo = "text"
+    ) |>
+      layout(
+        title         = list(text = "Top 10 Studios By Score"),
+        xaxis         = list(title = "Average Scores"),
+        yaxis         = list(title = "Studios"),
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        margin        = list(l = 120)
+      )
+  })
+  
+
   output$recommendTable <- DT::renderDataTable({
     orig_data <- filtered_data() %>% 
       filter(!is.na(score)) %>%
