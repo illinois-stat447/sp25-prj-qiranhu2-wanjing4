@@ -1,4 +1,4 @@
-# Anime Data Analysis Website Application
+# Anime Statistics and Analysis Platform (ASAP)
 
 ## Overview
 
@@ -20,14 +20,14 @@ The project will also answer the questions below
 1.  Are the highest-rated anime also the most widely watched?
 
     -   Do anime with top user scores also have the largest number of viewers/members
-        -   Are there highly rated “hidden gem” series that relatively few people have seen?
+        -   Are there highly rated "hidden gem" series that relatively few people have seen?
     -   Conversely, are some extremely popular titles only moderately rated?
 
-2.  What do the most “favorite” anime have in common?
+2.  What do the most "favorite" anime have in common?
 
     -   Are fans marking their favorites usually the highest-scoring and most popular ones?
 
-    -   Do certain genres or unique content qualities inspire a disproportionately high number of favorites even if those anime aren’t at the very top of the popularity charts?
+    -   Do certain genres or unique content qualities inspire a disproportionately high number of favorites even if those anime aren't at the very top of the popularity charts?
 
 3.  Which studios or producers consistently produce top-performing anime?
 
@@ -35,7 +35,7 @@ The project will also answer the questions below
 
         -   How can we efficiently identify these could highlight which production teams repeatedly create hits.
 
-4.  Does the score of an anime’s influence its popularity?
+4.  Does the score of an anime's influence its popularity?
 
     -   Are higher rated animes tend to earn higher popularity or attract more members or vice versa?
 
