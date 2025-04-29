@@ -153,14 +153,6 @@ ui <- fluidPage(
         box-shadow: 2px 2px 5px rgba(0,0,0,0.3);
         font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
       }
-      .summary-card h3 {
-        margin: 0;            
-        line-height: 1.2;
-      }
-      .summary-card h4 {
-        margin: 0;          
-        line-height: 1.2;
-      }
       .summary-card:hover {
         transform: scale(1.05);
       }
@@ -225,8 +217,8 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(3, uiOutput("card_medianScore_ui")),
-                   column(3, uiOutput("card_maxScore_ui")),
-                   column(3, uiOutput("card_minScore_ui")),
+                   column(3, uiOutput("card_ratingDist_ui")),
+                   column(3, uiOutput("card_typeDist_ui")),
                    column(3, uiOutput("card_avgEpisodes_ui"))
                  )
         )
@@ -661,7 +653,6 @@ server <- function(input, output, session) {
     datatable(final_data, options = list(searching = FALSE))
   })
   
-  # REACTIVE SUMMARY
   summary_details <- reactive({
     df <- filtered_data()
     total <- nrow(df)
@@ -676,7 +667,6 @@ server <- function(input, output, session) {
          medianScore = medianScore, maxScore = maxScore, minScore = minScore, avgEpisodes = avgEpisodes)
   })
   
-  # SUMMARY CARDS (unchanged)
   output$card_total_ui <- renderUI({
     actionLink("card_total", 
                div(class = "summary-card",
@@ -722,20 +712,18 @@ server <- function(input, output, session) {
     )
   })
   
-  output$card_maxScore_ui <- renderUI({
-    actionLink("card_maxScore", 
+  output$card_ratingDist_ui <- renderUI({
+    actionLink("card_ratingDist",
                div(class = "summary-card",
-                   h4("Max Score"),
-                   h3(summary_details()$maxScore)
+                   h4("Anime MPAA Rating")
                )
     )
   })
   
-  output$card_minScore_ui <- renderUI({
-    actionLink("card_minScore", 
+  output$card_typeDist_ui <- renderUI({
+    actionLink("card_typeDist",
                div(class = "summary-card",
-                   h4("Min Score"),
-                   h3(summary_details()$minScore)
+                   h4("Anime Type")
                )
     )
   })
@@ -748,8 +736,7 @@ server <- function(input, output, session) {
                )
     )
   })
-  
-  # CARD MODALS (unchanged)
+
   observeEvent(input$card_total, {
     showModal(modalDialog(
       title = "Detailed Information: Total Anime",
@@ -832,11 +819,7 @@ server <- function(input, output, session) {
     
     ggplotly(p, tooltip = "none")
   })
-  
-  
-  
-  
-  
+
   observeEvent(input$card_avgMembers, {
     showModal(modalDialog(
       title = "Detailed Information: Members Distribution",
@@ -884,32 +867,87 @@ server <- function(input, output, session) {
     summary(df$score)
   })
   
-  observeEvent(input$card_maxScore, {
+  observeEvent(input$card_ratingDist, {
     showModal(modalDialog(
-      title = "Detailed Information: Highest Scoring Anime",
-      DT::dataTableOutput("modal_maxScoreTable"),
+      title    = "Rating Distribution",
+      plotlyOutput("modal_ratingPie"),
       easyClose = TRUE,
-      size = "l"
+      size     = "l"
     ))
-  })
-  output$modal_maxScoreTable <- DT::renderDataTable({
-    df <- filtered_data()
-    df <- df[!is.na(df$score), ]
-    head(df[order(-df$score), c("title", "score", "members", "favorites")], 10)
   })
   
-  observeEvent(input$card_minScore, {
+  output$modal_ratingPie <- renderPlotly({
+    df <- filtered_data()
+    if (!"rating" %in% names(df)) return(NULL)      
+    rating_counts <- df %>%
+      filter(!is.na(rating)) %>%
+      count(rating)
+
+    if (nrow(rating_counts) == 0) return(NULL)
+    
+    p <- ggplot(rating_counts, aes(x = "", y = n, fill = rating)) +
+      geom_col(width = 1) +
+      coord_polar(theta = "y") +
+      labs(fill = "Rating", title = "Anime MPAA Rating Distribution") +
+      theme_void() +
+      theme(plot.title = element_text(face = "bold", hjust = 0.5))
+    
+    ggplotly(p, tooltip = c("fill", "y"))
+  })
+  
+  observeEvent(input$card_typeDist, {
     showModal(modalDialog(
-      title = "Detailed Information: Lowest Scoring Anime",
-      DT::dataTableOutput("modal_minScoreTable"),
+      title    = "Type Distribution",
+      plotlyOutput("modal_typePie"),
       easyClose = TRUE,
-      size = "l"
+      size     = "l"
     ))
   })
-  output$modal_minScoreTable <- DT::renderDataTable({
+  
+  output$modal_ratingPie <- renderPlotly({
     df <- filtered_data()
-    df <- df[!is.na(df$score), ]
-    head(df[order(df$score), c("title", "score", "members", "favorites")], 10)
+    if (!"rating" %in% names(df)) return(NULL)
+    rating_counts <- df %>%
+      filter(!is.na(rating)) %>%
+      count(rating)
+    
+    if (nrow(rating_counts) == 0) {
+      return(plotly::plotly_empty(type = "pie") %>%
+               layout(title = "No Ratings Available"))
+    }
+    
+    plot_ly(
+      rating_counts,
+      labels = ~rating,
+      values = ~n,
+      type   = 'pie',
+      textinfo = 'label+percent',
+      hoverinfo = 'label+value'
+    ) %>%
+      layout(title = "Anime MPAA Rating Distribution")
+  })
+  
+  output$modal_typePie <- renderPlotly({
+    df <- filtered_data()
+    if (!"type" %in% names(df)) return(NULL)
+    type_counts <- df %>%
+      filter(!is.na(type)) %>%
+      count(type)
+    
+    if (nrow(type_counts) == 0) {
+      return(plotly::plotly_empty(type = "pie") %>%
+               layout(title = "No Types Available"))
+    }
+    
+    plot_ly(
+      type_counts,
+      labels = ~type,
+      values = ~n,
+      type   = 'pie',
+      textinfo = 'label+percent',
+      hoverinfo = 'label+value'
+    ) %>%
+      layout(title = "Anime Type Distribution")
   })
   
   observeEvent(input$card_avgEpisodes, {
