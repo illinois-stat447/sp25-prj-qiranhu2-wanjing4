@@ -1,3 +1,5 @@
+# Handeling Missing Data
+
 ```{r}
 library(httr)
 library(jsonlite)
@@ -209,11 +211,6 @@ for (page in 1100:1150) {
 
 ```
 
-
-
-
-
-
 ```{r}
 dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN genres TEXT;")
 
@@ -240,7 +237,8 @@ fetch_anime_genres <- function(mal_id) {
   }
 }
 mal_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime_full")$mal_id
-
+summary(mal_ids)
+length(mal_ids)
 ```
 
 ```{r}
@@ -275,7 +273,6 @@ for (i in start_index:length(mal_ids)) {
 
 
 ```
-
 
 ```{r}
 
@@ -330,7 +327,9 @@ ggplot(missing_df, aes(x = reorder(column, -missing_percent), y = missing_percen
 
 
 ```
+
 When title is missing, the entire row is invalid, we remove rows with title missing
+
 ```{r}
 # Read the anime_full table
 anime_data <- dbReadTable(conn, "anime_full")
@@ -342,6 +341,7 @@ nrow(anime_data)
 ```
 
 The valid anime rows is now 28318 instead of 28477. Inspect missing values again:
+
 ```{r}
 # Total number of rows
 n_rows <- nrow(anime_data)
@@ -361,18 +361,23 @@ missing_df <- missing_df[order(-missing_df$missing_percent), ]
 print(missing_df)
 
 
-ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent)) +
-  geom_bar(stat = "identity") +
-  geom_text(aes(label = paste0(round(missing_percent, 1), "%")), 
-            hjust = -0.1,  # Move the label a little to the right of bar
-            size = 4) +    # Text size
-  coord_flip() +
-  labs(x = "Column", y = "Missing Data (%)", title = "Percent Missing in anime_full Table", ) +
-  theme_minimal()
+ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent, fill = -missing_percent)) +
+    geom_bar(stat = "identity") +
+    geom_text(aes(label = paste0(round(missing_percent, 1), "%")), 
+              hjust = -0.1,  # Move the label a little to the right of bar
+              size = 4) +    # Text size
+    coord_flip() +
+    labs(x = "Attribute", y = "Missing Data (%)", title = "Percent Missing of each Attribute in Jikan Anime Data", fill = "Missing Percent" ) +
+    theme_minimal() +
+    theme(plot.title = element_text(hjust = 0.5, size = 28, face = "bold"),
+          axis.title.x = element_text(size = 19),
+          axis.title.y = element_text(size = 19),
+          axis.text.y = element_text(size = 14),)
 
 
 anime_data
 ```
+
 ```{r}
 dbGetQuery(conn, "
   SELECT broadcast_timezone, COUNT(*) AS count
@@ -380,6 +385,5 @@ dbGetQuery(conn, "
   GROUP BY broadcast_timezone
   ORDER BY count DESC
 ")
-
+length(anime_data[,1])
 ```
-
