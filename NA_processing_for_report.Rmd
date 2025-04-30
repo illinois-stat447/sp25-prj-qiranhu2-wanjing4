@@ -1,5 +1,7 @@
 # Handeling Missing Data
 
+## Fetch Data
+
 ```{r}
 library(httr)
 library(jsonlite)
@@ -286,6 +288,8 @@ dbGetQuery(conn, "SELECT * FROM anime_full ORDER BY mal_id DESC LIMIT 25")
 dbDisconnect(conn)
 ```
 
+## Check NAs
+
 ```{r}
 
 library(DBI)
@@ -318,6 +322,7 @@ print(missing_df)
 ```
 
 ```{r}
+# NA graph
 library(ggplot2)
 
 ggplot(missing_df, aes(x = reorder(column, -missing_percent), y = missing_percent)) +
@@ -360,7 +365,7 @@ missing_df <- missing_df[order(-missing_df$missing_percent), ]
 
 print(missing_df)
 
-
+# Missing value graph for the report
 ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent, fill = -missing_percent)) +
     geom_bar(stat = "identity") +
     geom_text(aes(label = paste0(round(missing_percent, 1), "%")), 
@@ -375,15 +380,20 @@ ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent
           axis.text.y = element_text(size = 14),)
 
 
-anime_data
 ```
 
+Last, we remove rows that don't have genre appear
+
 ```{r}
-dbGetQuery(conn, "
-  SELECT broadcast_timezone, COUNT(*) AS count
-  FROM anime_full
-  GROUP BY broadcast_timezone
-  ORDER BY count DESC
-")
-length(anime_data[,1])
+conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
+
+# Read the anime_full table
+anime_data <- dbReadTable(conn, "anime_full")
+# Keep only rows where title is NOT missing
+anime_data <- anime_data[!is.na(anime_data$title), ]
+nrow(anime_data)
+# Keep only rows where genres is NOT missing
+anime_data <- anime_data[!is.na(anime_data$genres),]
+nrow(anime_data)
+
 ```
