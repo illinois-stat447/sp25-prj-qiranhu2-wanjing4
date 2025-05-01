@@ -162,7 +162,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
+      numericInput("pages", "Total pages to fetch:", value = NULL, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
       div(
         id = "filter_inputs",
