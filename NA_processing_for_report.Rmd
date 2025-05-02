@@ -458,8 +458,8 @@ anime_data <- dbReadTable(conn, "anime_full")
 anime_data <- anime_data[!is.na(anime_data$title), ]
 nrow(anime_data)
 # Keep only rows where genres is NOT missing
-anime_data <- anime_data[!is.na(anime_data$genres),]
-nrow(anime_data)
+#anime_data <- anime_data[!is.na(anime_data$genres),]
+#nrow(anime_data)
 
 ```
 

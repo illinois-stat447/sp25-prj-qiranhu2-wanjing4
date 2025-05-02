@@ -46,6 +46,16 @@ Before implement Predictive Model, we do one hot encoding for genres
 # implement one hot encoding here
 # top 10 genre
 top10 <- c("Comedy", "Action", "Fantasy", "Adventure", "Sci-Fi", "Drama", "Romance", "Hentai", "Supernatural", "Slice of Life")
+
+orig_data <- anime_data %>% 
+  mutate(row_id = row_number())
+onehot <- orig_data %>%
+  mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+  unnest(genres_list) %>%
+  mutate(dummy = 1) %>%
+  pivot_wider(id_cols = row_id, names_from = genres_list, values_from = dummy, values_fill = list(dummy = 0))
+onehotdata <- left_join(orig_data, onehot, by = "row_id")
+onehotdata
 ```
 
 Use cross-validation to split training and testing set for better performance.

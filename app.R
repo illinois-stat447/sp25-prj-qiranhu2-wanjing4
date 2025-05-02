@@ -162,7 +162,7 @@ ui <- fluidPage(
   
   sidebarLayout(
     sidebarPanel(
-      numericInput("pages", "Number of pages to fetch:", value = 5, min = 1),
+      numericInput("pages", "Total pages to fetch:", value = NULL, min = 1),
       actionButton("fetch_show", "Fetch & Show Data"),
       div(
         id = "filter_inputs",
@@ -185,7 +185,8 @@ ui <- fluidPage(
                  fluidRow(
                    column(12, plotlyOutput("scatterPlot")),
                    column(12, plotlyOutput("areaPlot")),
-                   column(12, plotlyOutput("polarBarChart"))
+                   column(12, plotlyOutput("polarBarChart")),
+                   column(12, plotlyOutput("studioBar"))
                  )
         ),
         
@@ -216,8 +217,8 @@ ui <- fluidPage(
                  ),
                  fluidRow(
                    column(3, uiOutput("card_medianScore_ui")),
-                   column(3, uiOutput("card_maxScore_ui")),
-                   column(3, uiOutput("card_minScore_ui")),
+                   column(3, uiOutput("card_ratingDist_ui")),
+                   column(3, uiOutput("card_typeDist_ui")),
                    column(3, uiOutput("card_avgEpisodes_ui"))
                  )
         )
@@ -521,6 +522,66 @@ server <- function(input, output, session) {
       )
   })
   
+  output$studioBar <- renderPlotly({
+    
+    d <- filtered_data() |>
+      filter(!is.na(score))
+    
+    if (nrow(d) == 0) return(NULL)
+    
+    studio_vec <- strsplit(d$studios, ",\\s*")
+    df_list <- lapply(seq_along(studio_vec), function(i) {
+      if (length(studio_vec[[i]]) == 0 || studio_vec[[i]][1] == "") return(NULL)
+      data.frame(
+        studio = studio_vec[[i]],
+        score  = d$score[i],
+        stringsAsFactors = FALSE
+      )
+    })
+    d_expanded <- do.call(rbind, df_list)
+    
+    stats <- d_expanded |>
+      group_by(studio) |>
+      summarise(
+        avg_score = mean(score),
+        n_titles  = n(),
+        .groups   = "drop"
+      ) |>
+      arrange(desc(avg_score)) |>
+      slice_head(n = 15)
+    
+    plot_ly(
+      stats,
+      x = ~avg_score,
+      y = ~reorder(studio, avg_score),
+      type = "bar",
+      orientation = "h",
+      marker = list(
+        color      = ~(avg_score),
+        colorscale = "Portland", 
+        reversescale = TRUE, 
+        cmin       = min(stats$avg_score),
+        cmax       = max(stats$avg_score),
+        colorbar   = list(title = "Average Scores")
+      ),
+      text = ~paste0(
+        "<b>", studio, "</b>",
+        "<br>Average Score: ", round(avg_score, 2),
+        "<br>Number Of Titles: ", n_titles
+      ),
+      hoverinfo = "text"
+    ) |>
+      layout(
+        title         = list(text = "Top 10 Studios By Score"),
+        xaxis         = list(title = "Average Scores"),
+        yaxis         = list(title = "Studios"),
+        plot_bgcolor  = "white",
+        paper_bgcolor = "white",
+        margin        = list(l = 120)
+      )
+  })
+  
+
   output$recommendTable <- DT::renderDataTable({
     orig_data <- filtered_data() %>% 
       filter(!is.na(score)) %>%
@@ -592,7 +653,6 @@ server <- function(input, output, session) {
     datatable(final_data, options = list(searching = FALSE))
   })
   
-  # REACTIVE SUMMARY
   summary_details <- reactive({
     df <- filtered_data()
     total <- nrow(df)
@@ -607,7 +667,6 @@ server <- function(input, output, session) {
          medianScore = medianScore, maxScore = maxScore, minScore = minScore, avgEpisodes = avgEpisodes)
   })
   
-  # SUMMARY CARDS (unchanged)
   output$card_total_ui <- renderUI({
     actionLink("card_total", 
                div(class = "summary-card",
@@ -620,7 +679,7 @@ server <- function(input, output, session) {
   output$card_avgScore_ui <- renderUI({
     actionLink("card_avgScore", 
                div(class = "summary-card",
-                   h4("Average Score"),
+                   h4("Anime Average Score"),
                    h3(summary_details()$avgScore)
                )
     )
@@ -653,20 +712,18 @@ server <- function(input, output, session) {
     )
   })
   
-  output$card_maxScore_ui <- renderUI({
-    actionLink("card_maxScore", 
+  output$card_ratingDist_ui <- renderUI({
+    actionLink("card_ratingDist",
                div(class = "summary-card",
-                   h4("Max Score"),
-                   h3(summary_details()$maxScore)
+                   h4("Anime MPAA Rating")
                )
     )
   })
   
-  output$card_minScore_ui <- renderUI({
-    actionLink("card_minScore", 
+  output$card_typeDist_ui <- renderUI({
+    actionLink("card_typeDist",
                div(class = "summary-card",
-                   h4("Min Score"),
-                   h3(summary_details()$minScore)
+                   h4("Anime Type")
                )
     )
   })
@@ -679,8 +736,7 @@ server <- function(input, output, session) {
                )
     )
   })
-  
-  # CARD MODALS (unchanged)
+
   observeEvent(input$card_total, {
     showModal(modalDialog(
       title = "Detailed Information: Total Anime",
@@ -706,15 +762,64 @@ server <- function(input, output, session) {
       size = "l"
     ))
   })
+
   output$modal_avgScorePlot <- renderPlotly({
     df <- filtered_data()
     df <- df[!is.na(df$score), ]
-    p <- ggplot(df, aes(x = score)) + 
-      geom_histogram(binwidth = 0.5, fill = "#1DB954", color = "white") +
-      labs(title = "Score Distribution", x = "Score", y = "Count")
-    ggplotly(p)
+    mean_score <- mean(df$score)
+    sd_score   <- sd(df$score)
+
+    hist_info  <- hist(df$score, breaks = seq(0, 10, by = 0.5), plot = FALSE)
+    max_count  <- max(hist_info$counts)
+    
+    p <- ggplot(df, aes(x = score)) +
+      geom_histogram(
+        binwidth = 0.5,
+        aes(fill = after_stat(count)),
+        color = "white"
+      ) +
+      scale_fill_viridis_c(option = "plasma", name = "Count") +
+      annotate(
+        "rect",
+        xmin = mean_score - sd_score,
+        xmax = mean_score + sd_score,
+        ymin = 0,
+        ymax = Inf,
+        alpha = 0.1,
+        fill = "grey70"
+      ) +
+      geom_vline(xintercept = mean_score + sd_score,
+                 linetype = "dashed",
+                 linewidth = 1,
+                 color = "magenta") +
+      geom_vline(xintercept = mean_score - sd_score,
+                 linetype = "dashed",
+                 linewidth = 1,
+                 color = "magenta") +
+      annotate(
+        "text",
+        x     = 1,               
+        y     = max_count * 0.8, 
+        label = sprintf("Mean = %.2f\nSD   = %.2f", mean_score, sd_score),
+        hjust = 0, 
+        vjust = 1,
+        size  = 4
+      ) +
+      labs(
+        title = "Anime Score Distribution",
+        x     = "Score",
+        y     = "Count"
+      ) +
+      scale_x_continuous(limits = c(0, 10), breaks = 0:10) +
+      theme_minimal(base_size = 13) +
+      theme(
+        plot.title    = element_text(face = "bold", hjust = 0.5),
+        axis.title    = element_text(face = "bold")
+      )
+    
+    ggplotly(p, tooltip = "none")
   })
-  
+
   observeEvent(input$card_avgMembers, {
     showModal(modalDialog(
       title = "Detailed Information: Members Distribution",
@@ -762,32 +867,87 @@ server <- function(input, output, session) {
     summary(df$score)
   })
   
-  observeEvent(input$card_maxScore, {
+  observeEvent(input$card_ratingDist, {
     showModal(modalDialog(
-      title = "Detailed Information: Highest Scoring Anime",
-      DT::dataTableOutput("modal_maxScoreTable"),
+      title    = "Rating Distribution",
+      plotlyOutput("modal_ratingPie"),
       easyClose = TRUE,
-      size = "l"
+      size     = "l"
     ))
-  })
-  output$modal_maxScoreTable <- DT::renderDataTable({
-    df <- filtered_data()
-    df <- df[!is.na(df$score), ]
-    head(df[order(-df$score), c("title", "score", "members", "favorites")], 10)
   })
   
-  observeEvent(input$card_minScore, {
+  output$modal_ratingPie <- renderPlotly({
+    df <- filtered_data()
+    if (!"rating" %in% names(df)) return(NULL)      
+    rating_counts <- df %>%
+      filter(!is.na(rating)) %>%
+      count(rating)
+
+    if (nrow(rating_counts) == 0) return(NULL)
+    
+    p <- ggplot(rating_counts, aes(x = "", y = n, fill = rating)) +
+      geom_col(width = 1) +
+      coord_polar(theta = "y") +
+      labs(fill = "Rating", title = "Anime MPAA Rating Distribution") +
+      theme_void() +
+      theme(plot.title = element_text(face = "bold", hjust = 0.5))
+    
+    ggplotly(p, tooltip = c("fill", "y"))
+  })
+  
+  observeEvent(input$card_typeDist, {
     showModal(modalDialog(
-      title = "Detailed Information: Lowest Scoring Anime",
-      DT::dataTableOutput("modal_minScoreTable"),
+      title    = "Type Distribution",
+      plotlyOutput("modal_typePie"),
       easyClose = TRUE,
-      size = "l"
+      size     = "l"
     ))
   })
-  output$modal_minScoreTable <- DT::renderDataTable({
+  
+  output$modal_ratingPie <- renderPlotly({
     df <- filtered_data()
-    df <- df[!is.na(df$score), ]
-    head(df[order(df$score), c("title", "score", "members", "favorites")], 10)
+    if (!"rating" %in% names(df)) return(NULL)
+    rating_counts <- df %>%
+      filter(!is.na(rating)) %>%
+      count(rating)
+    
+    if (nrow(rating_counts) == 0) {
+      return(plotly::plotly_empty(type = "pie") %>%
+               layout(title = "No Ratings Available"))
+    }
+    
+    plot_ly(
+      rating_counts,
+      labels = ~rating,
+      values = ~n,
+      type   = 'pie',
+      textinfo = 'label+percent',
+      hoverinfo = 'label+value'
+    ) %>%
+      layout(title = "Anime MPAA Rating Distribution")
+  })
+  
+  output$modal_typePie <- renderPlotly({
+    df <- filtered_data()
+    if (!"type" %in% names(df)) return(NULL)
+    type_counts <- df %>%
+      filter(!is.na(type)) %>%
+      count(type)
+    
+    if (nrow(type_counts) == 0) {
+      return(plotly::plotly_empty(type = "pie") %>%
+               layout(title = "No Types Available"))
+    }
+    
+    plot_ly(
+      type_counts,
+      labels = ~type,
+      values = ~n,
+      type   = 'pie',
+      textinfo = 'label+percent',
+      hoverinfo = 'label+value'
+    ) %>%
+      layout(title = "Anime Type Distribution")
   })
   
   observeEvent(input$card_avgEpisodes, {
