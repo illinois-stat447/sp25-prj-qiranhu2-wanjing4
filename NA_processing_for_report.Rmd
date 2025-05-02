@@ -275,6 +275,71 @@ for (i in start_index:length(mal_ids)) {
 
 
 ```
+Add studios and producers into database
+```{r}
+dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN producers TEXT;")
+dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN studios TEXT;")
+
+```
+
+```{r}
+library(httr)
+library(jsonlite)
+
+fetch_producers_studios <- function(mal_id) {
+  url <- paste0("https://api.jikan.moe/v4/anime/", mal_id, "/full")
+  resp <- GET(url)
+  
+  if (status_code(resp) == 200) {
+    data <- fromJSON(content(resp, "text", encoding = "UTF-8"), simplifyDataFrame = FALSE)$data
+    
+    producers <- if (length(data$producers) > 0) {
+      paste(sapply(data$producers, function(x) x$name), collapse = ", ")
+    } else {
+      NA
+    }
+    
+    studios <- if (length(data$studios) > 0) {
+      paste(sapply(data$studios, function(x) x$name), collapse = ", ")
+    } else {
+      NA
+    }
+    
+    return(list(producers = producers, studios = studios))
+  } else {
+    cat("Failed to fetch", mal_id, "Status:", status_code(resp), "\n")
+    return(list(producers = NA, studios = NA))
+  }
+}
+
+
+```
+
+```{r}
+mal_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime_full WHERE producers IS NULL OR studios IS NULL")$mal_id
+
+for (i in seq_along(mal_ids)) {
+  id <- mal_ids[i]
+  info <- fetch_producers_studios(id)
+  
+  dbExecute(conn,
+    "UPDATE anime_full SET producers = ?, studios = ? WHERE mal_id = ?",
+    params = list(info$producers, info$studios, id)
+  )
+  
+  cat("Updated mal_id:", id, "\n")
+  Sys.sleep(0.5)  # Be polite to the API
+}
+# instruction for fecthing from middle mal_id refer to 259 to 263 line
+# 377 now
+```
+
+
+
+
+
+
+
 
 ```{r}
 
@@ -395,5 +460,11 @@ nrow(anime_data)
 # Keep only rows where genres is NOT missing
 anime_data <- anime_data[!is.na(anime_data$genres),]
 nrow(anime_data)
+
+```
+
+We are also interested in producers and studio for predictive analysis so we fetch the producer and studios:
+
+```{r}
 
 ```

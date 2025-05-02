@@ -1,45 +1,61 @@
 # Predictive Analysis
 
-Load library
+### Importing Necessary Libraries
+
 ```{r}
 # load library here
 library(DBI)
 library(RSQLite)
 ```
 
+### **Loading the Dataset**
+
 Load the cleaned data from NA_processing Rmd. Call this function whenver we need this version of dataset
+
 ```{r}
+# use fetched database to clean the data
+# then return a data frame for predictive analysis
 clean_data <- function() {
   # connect to db and read table
   conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
   
   anime_data <- dbReadTable(conn, "anime_full")
+  
+  selected_attributes <- c("mal_id", "title", "type", "episodes", "status", 
+                          "rating", "score", "scored_by", "rank", "popularity", 
+                          "members", "favorites", "genres", "studios", "producers")
+  
+  anime_data <- anime_data[, selected_attributes]
  
   anime_data <- anime_data[!is.na(anime_data$title), ] # Keep only rows where title is NOT missing
   
   anime_data <- anime_data[!is.na(anime_data$genres),] # Keep only rows where genres is NOT missing
+  
   return(anime_data)
 }
 
 mydata <- clean_data()
 # summary(mydata) # uncomment this if need
+colnames(anime_data)
+
 ```
 
 Before implement Predictive Model, we do one hot encoding for genres
+
 ```{r}
 # implement one hot encoding here
 # top 10 genre
 top10 <- c("Comedy", "Action", "Fantasy", "Adventure", "Sci-Fi", "Drama", "Romance", "Hentai", "Supernatural", "Slice of Life")
 ```
 
-
 Use cross-validation to split training and testing set for better performance.
+
 ```{r}
 # implement cv here
 ```
 
-
 ## Linear Regression Predictive Analysis
+
 ```{r}
 # lm here
 ```
@@ -49,5 +65,3 @@ Use cross-validation to split training and testing set for better performance.
 ```{r}
 
 ```
-
-
