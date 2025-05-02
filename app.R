@@ -211,7 +211,7 @@ ui <- fluidPage(
     "))
   ),
   
-  titlePanel("Anime Data Fetcher"),
+  titlePanel("Anime Statistics and Analysis Platform (ASAP)"),
   
   sidebarLayout(
     
