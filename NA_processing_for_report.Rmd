@@ -356,8 +356,3 @@ nrow(anime_data)
 
 ```
 
-We are also interested in producers and studio for predictive analysis so we fetch the producer and studios:
-
-```{r}
-
-```
