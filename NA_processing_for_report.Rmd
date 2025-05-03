@@ -335,14 +335,30 @@ The valid anime rows is now 28318 instead of 28477. Inspect missing values again
 check_missing(anime_data1)
 ```
 
-Last, we remove rows that don't have genre appear and check missing data again
+
+
+### Clean Data for Predictive Analysis
+####  we remove rows that don't have genre appear
+#### we remove rows that don't have producers
+#### we remove rows that don't have studios 
+and check missing data again
 
 ```{r}
-
 anime_data2 <- anime_data1[!is.na(anime_data1$genres),]
 nrow(anime_data2)
 check_missing(anime_data2)
+anime_data3 <- anime_data2[!is.na(anime_data2$producers),]
+anime_data4 <- anime_data3[!is.na(anime_data3$studios),]
+check_missing(anime_data4)
 
+```
+#### Then, we select only the attributes we want
+```{r}
+selected_attributes <- c("mal_id", "title", "type", "episodes", "status", 
+                          "rating", "score", "scored_by", "rank", "popularity", 
+                          "members", "favorites", "genres", "studios", "producers")
+anime_data5 <- anime_data4[, selected_attributes]
+check_missing(anime_data5)
 ```
 
 ### Last
@@ -354,3 +370,11 @@ Use the dataset you want for each analysis section:\\
 -   anime_data1 = anime data with no empty title
 
 -   anime_data2 = anime data with no empty title and no empty genres
+
+### Improvement if have time
+instead of make a copy of each cleaned dataset, an efficient way can be implemented to make it save more storage space
+
+```{r}
+anime_data5
+```
+
