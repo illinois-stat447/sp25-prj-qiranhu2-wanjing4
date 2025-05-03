@@ -1,12 +1,21 @@
 # Handeling Missing Data
 
-## Fetch Data
+## Load libraries
 
 ```{r}
 library(httr)
 library(jsonlite)
 library(DBI)
 library(RSQLite)
+library(ggplot2)
+```
+
+## Fetch Data
+
+#### note: run data fetching part only once to make sure. To fetch all the data into database take couple hours
+
+```{r}
+
 
 # Connect to database
 conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
@@ -95,11 +104,14 @@ for (page in 1100:1150) {
 
 ```
 
-Attach genre to the database
+## Attach genre to the database
+
 ```{r}
 dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN genres TEXT;")
 
 ```
+
+### create function for fetch anime genres
 
 ```{r}
 library(httr)
@@ -124,6 +136,8 @@ fetch_anime_genres <- function(mal_id) {
 
 ```
 
+### fetch genres
+
 ```{r}
 # instead of get all mal_id, getting mal_id with whose genre is null is more efficient, and can also query multiple time if a computer is not avaliable right now.
 mal_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime_full WHERE genres IS NULL ")$mal_id
@@ -138,7 +152,7 @@ for (i in seq_along(mal_ids)) {
   cat("Updated mal_id:", id, "Genres:", genres, "\n")
   
   Sys.sleep(0.9) # Sleep to avoid hitting API rate limit
-  # fix this to 0.9 for full range of genre: For genre = NA in anime full, find it's genre. 
+
 }
 
 mal_ids <- mal_ids[720:length(mal_ids)]
@@ -162,12 +176,16 @@ for (i in start_index:length(mal_ids)) {
 # for test
 dbGetQuery(conn, "SELECT mal_id, genres, producers, studios FROM anime_full")
 ```
-Add studios and producers into database
+
+### Add studios and producers into database
+
 ```{r}
 dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN producers TEXT;")
 dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN studios TEXT;")
 
 ```
+
+### Create a callable function for fetching producers and studios
 
 ```{r}
 library(httr)
@@ -202,6 +220,8 @@ fetch_producers_studios <- function(mal_id) {
 mal_ids <- dbGetQuery(conn, "SELECT mal_id FROM anime_full WHERE producers IS NULL OR studios IS NULL")$mal_id
 ```
 
+### Fetch producers and studios
+
 ```{r}
 
 mal_ids[10000]
@@ -227,12 +247,7 @@ for (i in start_index:length(mal_ids)) {
 # 377 now
 ```
 
-
-
-
-
-
-
+## Test if data are avaliable
 
 ```{r}
 
@@ -246,47 +261,59 @@ dbGetQuery(conn, "SELECT * FROM anime_full ORDER BY mal_id DESC LIMIT 25")
 dbDisconnect(conn)
 ```
 
-## Check NAs
+# Check NAs
+
+### Create "check missing" function
 
 ```{r}
 
-library(DBI)
-library(RSQLite)
-
-# Connect if not already
-conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
-
-# Read the table
-anime_data <- dbReadTable(conn, "anime_full")
-
-# Total number of rows
-n_rows <- nrow(anime_data)
-
-# Find missing percentage for each column
-missing_summary <- sapply(anime_data, function(x) sum(is.na(x)) / n_rows * 100)
-
-# Turn into a nice data frame
-missing_df <- data.frame(
-  column = names(missing_summary),
-  missing_percent = round(missing_summary, 2)  # Round to 2 decimal places
-)
-
-# Sort by missing_percent descending
-missing_df <- missing_df[order(-missing_df$missing_percent), ]
-
-print(missing_df)
+check_missing <- function(thedata) {
+  # Total number of rows
+  n_rows <- nrow(thedata)
+  
+  # Find missing percentage for each column
+  missing_summary <- sapply(thedata, function(x) sum(is.na(x)) / n_rows * 100)
+  
+  # Turn into a nice data frame
+  missing_df <- data.frame(
+    column = names(missing_summary),
+    missing_percent = round(missing_summary, 2)  # Round to 2 decimal places
+  )
+  
+  # Sort by missing_percent descending
+  missing_df <- missing_df[order(-missing_df$missing_percent), ]
+  
+  print(missing_df)
+  
+  # Missing value graph for the report
+  ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent, fill = -missing_percent)) +
+      geom_bar(stat = "identity") +
+      geom_text(aes(label = paste0(round(missing_percent, 1), "%")), 
+                hjust = -0.1,  # Move the label a little to the right of bar
+                size = 4) +    # Text size
+      coord_flip() +
+      labs(x = "Attribute", y = "Missing Data (%)", title = "Percent Missing of each Attribute in Jikan Anime Data", fill = "Missing Percent" ) +
+      theme_minimal() +
+      theme(plot.title = element_text(hjust = 0.5, size = 28, face = "bold"),
+            axis.title.x = element_text(size = 19),
+            axis.title.y = element_text(size = 19),
+            axis.text.y = element_text(size = 14),)
+  
+}
 
 
 ```
 
-```{r}
-# NA graph
-library(ggplot2)
+### check current raw dataset
 
-ggplot(missing_df, aes(x = reorder(column, -missing_percent), y = missing_percent)) +
-  geom_bar(stat = "identity") +
-  coord_flip() +
-  labs(x = "Column", y = "Missing Data (%)", title = "Percent Missing in anime_full Table")
+```{r}
+# Connect if not already
+conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
+
+# Read the table
+anime_data0 <- dbReadTable(conn, "anime_full")
+
+check_missing(anime_data0)
 
 
 ```
@@ -294,65 +321,36 @@ ggplot(missing_df, aes(x = reorder(column, -missing_percent), y = missing_percen
 When title is missing, the entire row is invalid, we remove rows with title missing
 
 ```{r}
-# Read the anime_full table
-anime_data <- dbReadTable(conn, "anime_full")
+
 # Keep only rows where title is NOT missing
-anime_data <- anime_data[!is.na(anime_data$title), ]
-sum(is.na(anime_data$title))
-nrow(anime_data)
+anime_data1 <- anime_data0[!is.na(anime_data0$title), ]
+sum(is.na(anime_data1$title))
+nrow(anime_data1)
 
 ```
 
 The valid anime rows is now 28318 instead of 28477. Inspect missing values again:
 
 ```{r}
-# Total number of rows
-n_rows <- nrow(anime_data)
-
-# Find missing percentage for each column
-missing_summary <- sapply(anime_data, function(x) sum(is.na(x)) / n_rows * 100)
-
-# Turn into a nice data frame
-missing_df <- data.frame(
-  column = names(missing_summary),
-  missing_percent = round(missing_summary, 2)  # Round to 2 decimal places
-)
-
-# Sort by missing_percent descending
-missing_df <- missing_df[order(-missing_df$missing_percent), ]
-
-print(missing_df)
-
-# Missing value graph for the report
-ggplot(missing_df, aes(x = reorder(column, missing_percent), y = missing_percent, fill = -missing_percent)) +
-    geom_bar(stat = "identity") +
-    geom_text(aes(label = paste0(round(missing_percent, 1), "%")), 
-              hjust = -0.1,  # Move the label a little to the right of bar
-              size = 4) +    # Text size
-    coord_flip() +
-    labs(x = "Attribute", y = "Missing Data (%)", title = "Percent Missing of each Attribute in Jikan Anime Data", fill = "Missing Percent" ) +
-    theme_minimal() +
-    theme(plot.title = element_text(hjust = 0.5, size = 28, face = "bold"),
-          axis.title.x = element_text(size = 19),
-          axis.title.y = element_text(size = 19),
-          axis.text.y = element_text(size = 14),)
-
-
+check_missing(anime_data1)
 ```
 
-Last, we remove rows that don't have genre appear
+Last, we remove rows that don't have genre appear and check missing data again
 
 ```{r}
-conn <- dbConnect(SQLite(), "anime_full_database.sqlite")
 
-# Read the anime_full table
-anime_data <- dbReadTable(conn, "anime_full")
-# Keep only rows where title is NOT missing
-anime_data <- anime_data[!is.na(anime_data$title), ]
-nrow(anime_data)
-# Keep only rows where genres is NOT missing
-#anime_data <- anime_data[!is.na(anime_data$genres),]
-#nrow(anime_data)
+anime_data2 <- anime_data1[!is.na(anime_data1$genres),]
+nrow(anime_data2)
+check_missing(anime_data2)
 
 ```
 
+### Last
+
+Use the dataset you want for each analysis section:\\
+
+-   anime_data0 = raw data from Jikan API
+
+-   anime_data1 = anime data with no empty title
+
+-   anime_data2 = anime data with no empty title and no empty genres
