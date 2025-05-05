@@ -7,6 +7,8 @@
 library(DBI)
 library(RSQLite)
 library(dplyr)
+library(caret)
+library(randomForest)
 ```
 
 ### **Loading the Dataset**
@@ -14,7 +16,7 @@ library(dplyr)
 Load the cleaned data from NA_processing Rmd. Call this function whenver we need this version of dataset
 
 ```{r}
-p_data <- anime_data5
+p_data <- anime_data9
 summary(p_data)
 ```
 
@@ -43,199 +45,165 @@ data_1hot <- p_data |>
   select(-row_id)
 # we delete the original genres column
 data_1hot <- data_1hot |> select(-genres)
-data_1hot
+summary(data_1hot)
 ```
-Implement onehot encoding for type and rating:
+## Randomly split into training and testing set
 ```{r}
-# first find how many unique value for type and rating
+# set seed to make sure the same result can be generate again
+set.seed(123)
+data_1hot <- na.omit(data_1hot)
+train_index <- sample(seq_len(nrow(data_1hot)), size = 0.5 * nrow(data_1hot))
 
-unique_types <- unique(anime_data$type)
-length(unique_types)  # number of unique types
-
-unique_ratings <- unique(anime_data$rating)
-length(unique_ratings)  # number of unique ratings
-
-unique_types
-unique_ratings
-
+train_data <- data_1hot[train_index, ]
+test_data <- data_1hot[-train_index, ]
 
 ```
 
 Use cross-validation to split training and validation set for better performance.
 
 ```{r}
-# implement cv here
+# 10 fold
+train_control <- trainControl(method = "cv", number = 10)
 ```
 
 ## Linear Regression Predictive Analysis
+### Model Fitting
 
 ```{r}
-# lm here
-orig <- anime_data() %>%
-      filter(
-        !is.na(score),
-        !is.na(episodes),
-        !is.na(scored_by),
-        !is.na(popularity),
-        !is.na(members),
-        !is.na(favorites)
-      )
-    
-    req(nrow(orig) >= 10)
-    
-    lm(score ~ episodes + scored_by + popularity + members + favorites, data = orig)
-    
-
-  output$predictTable <- DT::renderDataTable({
-    
-    orig <- filtered_data() %>%
-      filter(
-        !is.na(score),
-        !is.na(episodes),
-        !is.na(scored_by),
-        !is.na(popularity),
-        !is.na(members),
-        !is.na(favorites)
-      )
-    
-    fit <- lm_model()
-    
-    orig$PredictedScore <- predict(fit, newdata = orig)
-
-    tbl <- orig %>%
-      arrange(desc(PredictedScore)) %>%
-      slice_head(n = 10) %>%
-      select(
-        title, type, episodes, status, rating,
-        rank, popularity, members, favorites,
-        score, PredictedScore, genres, studios, producers, mal_id
-      ) %>%
-      rename(
-        "Anime Title"     = title,
-        "Anime Type"      = type,
-        "Episodes"        = episodes,
-        "Release Status"  = status,
-        "Anime Rating"    = rating,
-        "Anime Rank"      = rank,
-        "Anime Popularity"= popularity,
-        "Viewers"         = members,
-        "Favorites"       = favorites,
-        "Current Score"    = score,
-        "Predicted Score" = PredictedScore,
-        "Genres"          = genres,
-        "Studios"         = studios,
-        "Producers"       = producers,
-        "Anime ID"        = mal_id
-      )
-    
-    DT::datatable(
-      tbl,
-      options = list(pageLength = 10, searching = FALSE),
-      rownames = FALSE
-    )
-    
-  })
-
-  output$lm_plot <- renderPlotly({
-    
-    fit <- lm_model()
-    req(fit)
-    
-    df_plot <- data.frame(
-      Fitted = fitted(fit),
-      Actual = fit$model$score
-    )
-    
-    p <- ggplot(df_plot, aes(x = Fitted, y = Actual)) +
-      geom_point() +
-      geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
-      labs(
-        x     = "Predicted Score",
-        y     = "Current Score",
-        title = "Current Score vs. Predicted Score Based On Our Model"
-      )
-    
-    ggplotly(p)
-    
-  })
-  
-  
+model_lm <- train(score ~ .,
+                  data = train_data,
+                  method = "lm",
+                  trControl = train_control)  
+summary(model_lm)
 ```
 
-## XGBoost Predictive Analysis
-
+### Check the model performance using training set
 ```{r}
-   orig_data <- anime_data() %>% 
-      filter(!is.na(score)) %>%
-      mutate(row_id = row_number())
-    
-    onehot <- orig_data %>%
-      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
-      unnest(genres_list, keep_empty = TRUE) %>%
-      mutate(dummy = 1) %>%
-      pivot_wider(id_cols = row_id, 
-                  names_from = genres_list, 
-                  values_from = dummy, 
-                  values_fill = list(dummy = 0))
-    
-    final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
-      select(-row_id) %>%
-      mutate(
-        fav_pct = ifelse(members > 0, favorites/members*100, NA),
-        scored_pct = ifelse(members > 0, scored_by/members*100, NA)
-      ) %>%
-      distinct(mal_id, .keep_all = TRUE)
-    
-    if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
-      
-      final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
-      
-    }
-    
-    genre_cols <- setdiff(colnames(onehot), "row_id")
-    
-    X <- as.matrix(final_data[, genre_cols])
-    y <- final_data$score
-    
-    dtrain <- xgb.DMatrix(data = X, label = y)
-    params <- list(objective = "reg:squarederror", eval_metric = "rmse", eta = 0.1, max_depth = 6)
-    
-    xgb_model <- xgb.train(
-      params = params,
-      data = dtrain,
-      nrounds = 50,
-      verbose = 0, 
-      gamma = 1
-    )
-    
-    final_data$recommendation_score <- predict(xgb_model, X)
-    
-    final_data <- final_data %>% 
-      arrange(desc(recommendation_score)) %>%
-      head(50) %>%
-      select(title, type, episodes, status, rating, rank, popularity,
-             members, score, scored_by, scored_pct, favorites, fav_pct, genres, studios, producers, mal_id, everything()) %>%
-      rename(
-        "Anime Title" = title,
-        "Anime Type" = type,
-        "Episodes" = episodes,
-        "Release Status" = status,
-        "Anime Rating" = rating,
-        "Anime Rank" = rank,
-        "Anime Popularity" = popularity,
-        "Viewers" = members,
-        "Anime Score" = score,
-        "Viewers Who Scored" = scored_by,
-        "Scored Rate" = scored_pct,
-        "Favorites" = favorites,
-        "Favorited Rate" = fav_pct,
-        "Genres" = genres,
-        "Studios" = studios,
-        "Producers" = producers,
-        "Anime ID" = mal_id,
-        "Recommendation Score" = recommendation_score
-      )
-    
-    datatable(final_data, options = list(searching = FALSE))
-    
+lm_train_predictions <- predict(model_lm, newdata = train_data)
+# Evaluate the performance
+rmse_lm_train <- RMSE(lm_train_predictions, train_data$score)
+r2_lm_train <- R2(lm_train_predictions, train_data$score)
+
+cat("RMSE:", rmse_lm_train, "\n")
+cat("R-squared:", r2_lm_train, "\n")
+
 ```
+#### plot the training performance
+```{r}
+plot(train_data$score, lm_train_predictions,
+     xlab = "Actual Score", ylab = "Predicted Score",
+     main = "Predicted vs Actual Scores of \nLinear Regression Predictive Model (Train)",
+     col = "steelblue", pch = 19, cex.main = 2.0, cex.lab = 1.5)
+abline(a = 0, b = 1, col = "red")
+
+# Add RMSE and R² to the top-left corner
+text(x = min(train_data$score), 
+     y = max(lm_train_predictions), 
+     labels = paste0("RMSE = ", round(rmse_lm_train, 3), 
+                     "\nR² = ", round(r2_lm_train, 3)),
+     adj = c(0, 1),   # Left-top alignment
+     cex = 1.0)       # Text size
+```
+
+### Prediction using Testing Set
+predict the score of test data and check the performance
+```{r}
+
+lm_test_predictions <- predict(model_lm, newdata = test_data)
+# Evaluate the performance
+rmse_lm_test <- RMSE(lm_test_predictions, test_data$score)
+r2_lm_test <- R2(lm_test_predictions, test_data$score)
+
+cat("RMSE:", rmse, "\n")
+cat("R-squared:", r2, "\n")
+```
+### plot the result
+```{r}
+plot(test_data$score, predictions,
+     xlab = "Actual Score", ylab = "Predicted Score",
+     main = "Predicted vs Actual Scores of \nLinear Regression Predictive Model",
+     col = "steelblue", pch = 19, cex.main = 2.0, cex.lab = 1.5)
+abline(a = 0, b = 1, col = "red")
+
+# Add RMSE and R² to the top-left corner
+text(x = min(test_data$score), 
+     y = max(predictions), 
+     labels = paste0("RMSE = ", round(rmse_lm_test, 3), 
+                     "\nR² = ", round(r2_lm_test, 3)),
+     adj = c(0, 1),   # Left-top alignment
+     cex = 1.0)       # Text size
+
+```
+
+
+## Random Forest Predictive Analysis
+### Model Fitting
+```{r}
+model_rf <- train(
+  score ~ ., 
+  data = train_data,
+  method = "rf",
+  ntree = 10,
+  trControl = train_control,
+  importance = TRUE
+)
+```
+### Check the model performance using training set
+```{r}
+rf_train_predictions <- predict(model_rf, newdata = train_data)
+# Calculate RMSE and R-squared
+rmse_rf_train <- RMSE(rf_train_predictions, train_data$score)
+r2_rf_train <- R2(rf_train_predictions, train_data$score)
+
+cat("RMSE:", rmse_rf_train, "\n")
+cat("R-squared:", r2_rf_train, "\n")
+
+```
+### Plot the result
+```{r}
+plot(train_data$score, rf_train_predictions,
+     xlab = "Actual Score", ylab = "Predicted Score",
+     main = "Predicted vs Actual Scores of \nRandom Forest Predictive Model(Train)",
+     col = "steelblue", pch = 19, cex.main = 2.0, cex.lab = 1.5)
+abline(a = 0, b = 1, col = "red")
+
+# Add RMSE and R² to the top-left corner
+text(x = min(train_data$score), 
+     y = max(rf_train_predictions), 
+     labels = paste0("RMSE = ", round(rmse_rf_train, 3), 
+                     "\nR² = ", round(r2_rf_train, 3)),
+     adj = c(0, 1),   # Left-top alignment
+     cex = 1.0)       # Text size
+```
+
+
+
+### Prediction using Testing Set
+```{r}
+rf_test_predictions <- predict(model_rf, newdata = test_data)
+# Calculate RMSE and R-squared
+rmse_rf_test <- RMSE(rf_test_predictions, test_data$score)
+r2_rf_test <- R2(rf_test_predictions, test_data$score)
+
+cat("RMSE:", rmse_rf_test, "\n")
+cat("R-squared:", r2_rf_test, "\n")
+
+```
+### Plot the result
+```{r}
+plot(test_data$score, rf_test_predictions,
+     xlab = "Actual Score", ylab = "Predicted Score",
+     main = "Predicted vs Actual Scores of \nRandom Forest Predictive Model",
+     col = "steelblue", pch = 19, cex.main = 2.0, cex.lab = 1.5)
+abline(a = 0, b = 1, col = "red")
+
+# Add RMSE and R² to the top-left corner
+text(x = min(test_data$score), 
+     y = max(rf_test_predictions), 
+     labels = paste0("RMSE = ", round(rmse_rf_test, 3), 
+                     "\nR² = ", round(r2_rf_test, 3)),
+     adj = c(0, 1),   # Left-top alignment
+     cex = 1.0)       # Text size
+
+```
+
