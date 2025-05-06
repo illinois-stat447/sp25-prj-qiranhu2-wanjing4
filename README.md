@@ -95,5 +95,3 @@ Wikimedia Foundation. (2025, April 22). Statistics. Wikipedia. <https://en.wikip
 
  Purini, R. (2024, July 3). Sony Group Portal - Crunchyroll’s mission to be the ultimate destination for anime fans. Sony Group Portal - Home. <https://www.sony.com/en/SonyInfo/blog/2024/07/03/>
 
-
-\
