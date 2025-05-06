@@ -3,8 +3,8 @@ title: "Anime Statistics and Analysis Platform (ASAP)"
 author: "Qiran Hu (qiranhu2), Zoey Yao (wanjing4)"
 date: "May 6, 2025"
 output:
-#  beamer_presentation: default
 #  slidy_presentation: default
+#  beamer_presentation: default
 #  ioslides_presentation:
 #    widescreen: true
   pdf_document:
@@ -55,7 +55,9 @@ Predictive Model Data Preprocessing
 
 ------------------------------------------------------------------------\newpage
 
-# Predictive Model **Training, Validation, and Testing Set**
+# Predictive Model 
+
+Training, Validation, and Testing Set
 
 ```         
 → 10‐fold Cross Validation 
