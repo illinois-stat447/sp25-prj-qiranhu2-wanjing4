@@ -7,6 +7,8 @@ Zoey Yao ([wanjing4\@illinois.edu](mailto:wanjing4@illinois.edu))
 
 ## Link To Our Presentation
 
+https://uofi.box.com/s/h2lxjv17jtb5sndd9jh81x91fl7izf3q
+
 ## Project Proposal
 
 This project aims to develop a Shiny website application that integrates with the anime Data API to analyze the popularity trend of anime. Interactive visualizations and prediction analysis will be implemented. The application will provide valuable insights for researchers and the general public, enabling them to better understand public's taste on anime.
