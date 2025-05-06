@@ -249,7 +249,7 @@ ui <- fluidPage(
                    column(12, plotlyOutput("studioBar"))
                  )
         ),
-    
+        
         tabPanel("Explore New Animes Based On Your Preference",
                  DT::dataTableOutput("recommendTable")
         ),
@@ -494,10 +494,10 @@ server <- function(input, output, session) {
     data <- data[!is.na(data$score) & !is.na(data$members), ]
     
     if(nrow(data) == 0) return(NULL)
-
+    
     r_val <- cor(data$score, data$members, use = "complete.obs")
     r_label <- paste0("r = ", round(r_val, 2))
-
+    
     p <- plot_ly(
       data,
       x = ~score,
@@ -535,7 +535,7 @@ server <- function(input, output, session) {
         
         plot_bgcolor = "white",
         paper_bgcolor = "white",
-
+        
         annotations = list(
           list(
             xref      = "paper", yref = "paper",
@@ -546,7 +546,7 @@ server <- function(input, output, session) {
           )
         )
       )
-
+    
     p
     
   })
@@ -744,7 +744,7 @@ server <- function(input, output, session) {
       )
     
   })
-
+  
   output$recommendTable <- DT::renderDataTable({
     
     orig_data <- filtered_data() %>% 
@@ -839,7 +839,7 @@ server <- function(input, output, session) {
     lm(score ~ episodes + scored_by + popularity + members + favorites, data = orig)
     
   })
-
+  
   output$predictTable <- DT::renderDataTable({
     
     orig <- filtered_data() %>%
@@ -855,7 +855,7 @@ server <- function(input, output, session) {
     fit <- lm_model()
     
     orig$PredictedScore <- predict(fit, newdata = orig)
-
+    
     tbl <- orig %>%
       arrange(desc(PredictedScore)) %>%
       slice_head(n = 10) %>%
@@ -889,7 +889,7 @@ server <- function(input, output, session) {
     )
     
   })
-
+  
   output$lm_plot <- renderPlotly({
     
     fit <- lm_model()
@@ -1025,7 +1025,7 @@ server <- function(input, output, session) {
     )
     
   })
-
+  
   observeEvent(input$card_total, {
     
     showModal(modalDialog(
@@ -1063,7 +1063,7 @@ server <- function(input, output, session) {
     ))
     
   })
-
+  
   output$modal_avgScorePlot <- renderPlotly({
     
     df <- filtered_data()
@@ -1071,7 +1071,7 @@ server <- function(input, output, session) {
     
     mean_score <- mean(df$score)
     sd_score   <- sd(df$score)
-
+    
     hist_info  <- hist(df$score, breaks = seq(0, 10, by = 0.5), plot = FALSE)
     max_count  <- max(hist_info$counts)
     
@@ -1119,7 +1119,7 @@ server <- function(input, output, session) {
     ggplotly(p, tooltip = "none")
     
   })
-
+  
   observeEvent(input$card_avgMembers, {
     
     showModal(modalDialog(
@@ -1168,7 +1168,7 @@ server <- function(input, output, session) {
     )
     
   })
-
+  
   observeEvent(input$card_avgEpisodes, {
     
     showModal(modalDialog(
@@ -1194,7 +1194,7 @@ server <- function(input, output, session) {
     )
     
   })
-
+  
   observeEvent(input$card_popularity, {
     
     showModal(modalDialog(
@@ -1240,7 +1240,7 @@ server <- function(input, output, session) {
     rating_counts <- df %>%
       filter(!is.na(rating)) %>%
       count(rating)
-
+    
     if (nrow(rating_counts) == 0) return(NULL)
     
     p <- ggplot(rating_counts, aes(x = "", y = n, fill = rating)) +
@@ -1355,18 +1355,18 @@ server <- function(input, output, session) {
       filter(!is.na(genres) & genres != "") %>%
       mutate(genres_list = strsplit(genres, ",\\s*")) %>%
       unnest(cols = c(genres_list))
-      topGenre <- expanded %>%
+    topGenre <- expanded %>%
       group_by(genres_list) %>%
       tally(sort = TRUE) %>%
       slice_head(n=1) %>%
       pull(genres_list)
-      
+    
     if(is.na(topGenre)) {
       
       topGenre <- "Various"
       
     }
-      
+    
     tagList(
       p(paste("You’ve explored", total_anime,
               "accross", distinct_genres, "different genres")),

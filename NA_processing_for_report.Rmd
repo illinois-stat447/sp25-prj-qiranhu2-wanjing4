@@ -104,7 +104,7 @@ for (page in 1100:1150) {
 
 ```
 
-## Attach genre to the database
+## Attach genre to the database if needed
 
 ```{r}
 dbExecute(conn, "ALTER TABLE anime_full ADD COLUMN genres TEXT;")
