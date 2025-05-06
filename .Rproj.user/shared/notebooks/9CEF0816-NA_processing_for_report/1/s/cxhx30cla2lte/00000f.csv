@@ -1,0 +1,7 @@
+"0","anime_data2 <- anime_data1[!is.na(anime_data1$genres),]"
+"0","nrow(anime_data2)"
+"1","[1]"
+"1"," 22458"
+"1","
+"
+"0","check_missing(anime_data2)"

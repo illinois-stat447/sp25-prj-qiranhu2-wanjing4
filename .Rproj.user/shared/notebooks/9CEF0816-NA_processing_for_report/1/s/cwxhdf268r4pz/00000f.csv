@@ -1,0 +1,7 @@
+"0","# Connect if not already"
+"0","conn <- dbConnect(SQLite(), ""anime_full_database.sqlite"")"
+"0",""
+"0","# Read the table"
+"0","anime_data0 <- dbReadTable(conn, ""anime_full"")"
+"0",""
+"0","check_missing(anime_data0)"

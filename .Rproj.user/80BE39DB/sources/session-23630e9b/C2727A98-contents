@@ -1,0 +1,241 @@
+# Predictive Analysis
+
+### Importing Necessary Libraries
+
+```{r}
+# load library here
+library(DBI)
+library(RSQLite)
+library(dplyr)
+```
+
+### **Loading the Dataset**
+
+Load the cleaned data from NA_processing Rmd. Call this function whenver we need this version of dataset
+
+```{r}
+p_data <- anime_data5
+summary(p_data)
+```
+
+### Data Preprocessing for predictive analysis
+Before implement Predictive Model, we do one hot encoding for top10 genres
+
+```{r}
+# One-hot encode only for the top genres
+onehot_top10 <- p_data |>
+  mutate(row_id = row_number(),
+         genres = str_split(genres, ",\\s*")) |>
+  unnest(genres) |>
+  filter(genres %in% top10_genre) |>
+  mutate(dummy = 1) |>
+  pivot_wider(
+    id_cols = row_id,
+    names_from = genres,
+    values_from = dummy,
+    values_fill = list(dummy = 0)
+  )
+
+# Join back to original data
+data_1hot <- p_data |>
+  mutate(row_id = row_number()) |>
+  left_join(onehot_top10, by = "row_id") |>
+  select(-row_id)
+# we delete the original genres column
+data_1hot <- data_1hot |> select(-genres)
+data_1hot
+```
+Implement onehot encoding for type and rating:
+```{r}
+# first find how many unique value for type and rating
+
+unique_types <- unique(anime_data$type)
+length(unique_types)  # number of unique types
+
+unique_ratings <- unique(anime_data$rating)
+length(unique_ratings)  # number of unique ratings
+
+unique_types
+unique_ratings
+
+
+```
+
+Use cross-validation to split training and validation set for better performance.
+
+```{r}
+# implement cv here
+```
+
+## Linear Regression Predictive Analysis
+
+```{r}
+# lm here
+orig <- anime_data() %>%
+      filter(
+        !is.na(score),
+        !is.na(episodes),
+        !is.na(scored_by),
+        !is.na(popularity),
+        !is.na(members),
+        !is.na(favorites)
+      )
+    
+    req(nrow(orig) >= 10)
+    
+    lm(score ~ episodes + scored_by + popularity + members + favorites, data = orig)
+    
+
+  output$predictTable <- DT::renderDataTable({
+    
+    orig <- filtered_data() %>%
+      filter(
+        !is.na(score),
+        !is.na(episodes),
+        !is.na(scored_by),
+        !is.na(popularity),
+        !is.na(members),
+        !is.na(favorites)
+      )
+    
+    fit <- lm_model()
+    
+    orig$PredictedScore <- predict(fit, newdata = orig)
+
+    tbl <- orig %>%
+      arrange(desc(PredictedScore)) %>%
+      slice_head(n = 10) %>%
+      select(
+        title, type, episodes, status, rating,
+        rank, popularity, members, favorites,
+        score, PredictedScore, genres, studios, producers, mal_id
+      ) %>%
+      rename(
+        "Anime Title"     = title,
+        "Anime Type"      = type,
+        "Episodes"        = episodes,
+        "Release Status"  = status,
+        "Anime Rating"    = rating,
+        "Anime Rank"      = rank,
+        "Anime Popularity"= popularity,
+        "Viewers"         = members,
+        "Favorites"       = favorites,
+        "Current Score"    = score,
+        "Predicted Score" = PredictedScore,
+        "Genres"          = genres,
+        "Studios"         = studios,
+        "Producers"       = producers,
+        "Anime ID"        = mal_id
+      )
+    
+    DT::datatable(
+      tbl,
+      options = list(pageLength = 10, searching = FALSE),
+      rownames = FALSE
+    )
+    
+  })
+
+  output$lm_plot <- renderPlotly({
+    
+    fit <- lm_model()
+    req(fit)
+    
+    df_plot <- data.frame(
+      Fitted = fitted(fit),
+      Actual = fit$model$score
+    )
+    
+    p <- ggplot(df_plot, aes(x = Fitted, y = Actual)) +
+      geom_point() +
+      geom_abline(slope = 1, intercept = 0, linetype = "dashed") +
+      labs(
+        x     = "Predicted Score",
+        y     = "Current Score",
+        title = "Current Score vs. Predicted Score Based On Our Model"
+      )
+    
+    ggplotly(p)
+    
+  })
+  
+  
+```
+
+## XGBoost Predictive Analysis
+
+```{r}
+   orig_data <- anime_data() %>% 
+      filter(!is.na(score)) %>%
+      mutate(row_id = row_number())
+    
+    onehot <- orig_data %>%
+      mutate(genres_list = strsplit(genres, ",\\s*")) %>%
+      unnest(genres_list, keep_empty = TRUE) %>%
+      mutate(dummy = 1) %>%
+      pivot_wider(id_cols = row_id, 
+                  names_from = genres_list, 
+                  values_from = dummy, 
+                  values_fill = list(dummy = 0))
+    
+    final_data <- left_join(orig_data, onehot, by = "row_id") %>% 
+      select(-row_id) %>%
+      mutate(
+        fav_pct = ifelse(members > 0, favorites/members*100, NA),
+        scored_pct = ifelse(members > 0, scored_by/members*100, NA)
+      ) %>%
+      distinct(mal_id, .keep_all = TRUE)
+    
+    if (!is.null(input$genre_filter) && length(input$genre_filter) > 0) {
+      
+      final_data <- final_data %>% filter(if_all(all_of(input$genre_filter), ~ . == 1))
+      
+    }
+    
+    genre_cols <- setdiff(colnames(onehot), "row_id")
+    
+    X <- as.matrix(final_data[, genre_cols])
+    y <- final_data$score
+    
+    dtrain <- xgb.DMatrix(data = X, label = y)
+    params <- list(objective = "reg:squarederror", eval_metric = "rmse", eta = 0.1, max_depth = 6)
+    
+    xgb_model <- xgb.train(
+      params = params,
+      data = dtrain,
+      nrounds = 50,
+      verbose = 0, 
+      gamma = 1
+    )
+    
+    final_data$recommendation_score <- predict(xgb_model, X)
+    
+    final_data <- final_data %>% 
+      arrange(desc(recommendation_score)) %>%
+      head(50) %>%
+      select(title, type, episodes, status, rating, rank, popularity,
+             members, score, scored_by, scored_pct, favorites, fav_pct, genres, studios, producers, mal_id, everything()) %>%
+      rename(
+        "Anime Title" = title,
+        "Anime Type" = type,
+        "Episodes" = episodes,
+        "Release Status" = status,
+        "Anime Rating" = rating,
+        "Anime Rank" = rank,
+        "Anime Popularity" = popularity,
+        "Viewers" = members,
+        "Anime Score" = score,
+        "Viewers Who Scored" = scored_by,
+        "Scored Rate" = scored_pct,
+        "Favorites" = favorites,
+        "Favorited Rate" = fav_pct,
+        "Genres" = genres,
+        "Studios" = studios,
+        "Producers" = producers,
+        "Anime ID" = mal_id,
+        "Recommendation Score" = recommendation_score
+      )
+    
+    datatable(final_data, options = list(searching = FALSE))
+    
+```
