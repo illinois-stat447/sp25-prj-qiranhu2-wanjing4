@@ -1,23 +1,26 @@
 ---
 title: "Anime Statistics and Analysis Platform (ASAP)"
 author: "Qiran Hu (qiranhu2), Zoey Yao (wanjing4)"
-date: "May 6th, 2025"
+date: "May 6, 2025"
 output:
   slidy_presentation: default
+  beamer_presentation: default
   ioslides_presentation:
     widescreen: true
-  beamer_presentation: default
+  pdf_document:
+    latex_engine: xelatex
+    toc: true
+    number_sections: true
 ---
+------------------------------------------------------------------------
 
-## From Subculture to Mainstream
+# Anime Statistics and Analysis Platform (ASAP)
 
-**Anime Statistics and Analysis Platform (ASAP)**\
+*Authors: Qiran Hu (qiranhu2), Zoey Yao (wanjing4)*
 
-*Authors: Qiran Hu (qiranhu2), Zoey Yao (wanjing4)*\
+From Subculture to Mainstream: Examining Anime’s Transformation From Microculture Into Global Mainstream Through User Engagements
 
-**Examining Anime’s Transformation From Microculture Into Global Mainstream Through User Engagements**
-
-The anime culture has become a global phenomenon that significantly influences popular culture and shapes the entertainment industry worldwide with skyrocketed revenues and unprecedented international growth in recent years.
+The anime culture has become a global phenomenon that significantly influences popular culture and shapes the entertainment industry worldwide with skyrocketed revenues and unprecedented international growth in recent years. 
 
 This research examines the key factors of anime’s global market expansion through “anime content creations and distributions” and analyzes their implications for stakeholders and investors as well as regular anime fans.
 
@@ -25,15 +28,15 @@ This research examines the key factors of anime’s global market expansion thro
 -   **Current Obstacles With Anime Market**\
 -   **Improving Industry Stakeholders Experience**
 
-------------------------------------------------------------------------
+------------------------------------------------------------------------\newpage
 
-## Data Preprocessing
+# Data Preprocessing
 
-### Handling Missing Values
+Handling Missing Values
 
 -   NA rows were removed
 
--   A lot of data 
+-   A lot of data
 
 Predictive Model Data Preprocessing
 
@@ -45,32 +48,35 @@ Predictive Model Data Preprocessing
 
 -   **Genres:** encodes top 10 with one-hot encoding
 
--   **Ratings:** ANOVA, Tukey Test, criteria 
+-   **Ratings:** ANOVA, Tukey Test, criteria
 
 ![](../AdditionalResources/1.png){width="50%"}
 
------------------------------------------------------------------------- \
+------------------------------------------------------------------------\newpage
 
-## Predictive Model **Training, Validation, and Testing Set**\
-    → 10‐fold Cross Validation 
-    
+# Predictive Model **Training, Validation, and Testing Set**
+
+```         
+→ 10‐fold Cross Validation 
+```
+
 Linear Regression Model
 
 -   Linearly predicts the score by giving different weights to predictors\
 
--   Shows a sigmoid shape when plotting 
+-   Shows a sigmoid shape when plotting
 
 Random Forest
 
 -   Multiple decision trees contribute to the model
 
--   Almost perfect alignment 
+-   Almost perfect alignment
 
 ![](../AdditionalResources/2.png){width="50%"}
 
------------------------------------------------------------------------- \
+------------------------------------------------------------------------\newpage
 
-## Future Plans And Set Ups
+# Future Plans And Set Ups
 
 As the global anime market continues its expansion, our proposed platform offers various benefits to both anime fans and stakeholders. However, as entertainment technology and consumer behavior rapidly evolve, we hope to extend our research to improve the user experience and address specific limitations in our current platform.
 
@@ -82,7 +88,7 @@ As the global anime market continues its expansion, our proposed platform offers
 
 -   Global Expansion And Creator Support\
 
-- Live Event Integration And Virtual Conventions
+-   Live Event Integration And Virtual Conventions
 
 Set Ups
 
@@ -97,6 +103,4 @@ Using Online Version
 If you prefer not to install anything, you can access the Anime Statistics and Analysis Platform directly in your web browser:\
 <https://qiranhu.shinyapps.io/AnimeStatisticsandAnalysisPlatform/>
 
------------------------------------------------------------------------- \
-
-
+------------------------------------------------------------------------\
