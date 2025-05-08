@@ -366,11 +366,11 @@ check_missing(anime_data5)
 ```
 
 #### Studios data processing
-The data analysis for studios is in data_analysis.Rmd. 
-We want to include the studios column when training the predictive model. Since the column has too many unique values, doint the one-hot encoding will result in a very high dimension of our dataset. We have considered to choose the top10 studios with higest 10 average score, but the output result shows studios with only 1 to 3 anime counts, which does not represent the studios' performance enough. 
 
-Based on the analysis, some of the well-known/popular studios usually have a high count of anime with along with a high score. Therefore, we decide to choose studios that have anime count >= 30 with a score >= 7.03 (the top 25% of the score). 
-##### find anime count for each studios
+The data analysis for studios is in data_analysis.Rmd. We want to include the studios column when training the predictive model. Since the column has too many unique values, doint the one-hot encoding will result in a very high dimension of our dataset. We have considered to choose the top10 studios with higest 10 average score, but the output result shows studios with only 1 to 3 anime counts, which does not represent the studios' performance enough.
+
+Based on the analysis, some of the well-known/popular studios usually have a high count of anime with along with a high score. Therefore, we decide to choose studios that have anime count \>= 30 with a score \>= 7.03 (the top 25% of the score). \##### find anime count for each studios
+
 ```{r}
 studios_stats <- anime_data5 |>
   group_by(studios) |>
@@ -382,9 +382,11 @@ studios_stats <- anime_data5 |>
 
 
 ```
-##### Filter studios with count >= 30 and score >= 7.03
-The output tibble show the studios that satisfy with our criteria. 
-The output makes sense because these studios below are all well-know studios that produce popular anime each season. 
+
+##### Filter studios with count \>= 30 and score \>= 7.03
+
+The output tibble show the studios that satisfy with our criteria. The output makes sense because these studios below are all well-know studios that produce popular anime each season.
+
 ```{r}
 top_studios <- studios_stats |>
   filter(count >= 30, avg_score >= 7.03)
@@ -392,8 +394,8 @@ top_studios
 ```
 
 ##### Add, Delete column for studios
-22 studios were selected. However, 22 is still to much for one-hot encoding. As the result, we decide to further manipulate the column by adding a new column with the following description:
-  For each row, if the studio belongs to 1 of the 22 top studios, we classify it as "top" Otherwise, it is "other".
+
+22 studios were selected. However, 22 is still to much for one-hot encoding. As the result, we decide to further manipulate the column by adding a new column with the following description: For each row, if the studio belongs to 1 of the 22 top studios, we classify it as "top" Otherwise, it is "other".
 
 ```{r}
 # list of top studios
@@ -411,7 +413,9 @@ anime_data6$studio_rank <- factor(anime_data6$studio_rank, levels = c("Top", "Ot
 anime_data6 <- anime_data6 |> select(-studios)
 
 ```
+
 Examine the dataset:
+
 ```{r}
 anime_data6
 boxplot(score ~ studio_rank,
@@ -424,16 +428,18 @@ summary(anime_data6)
 ```
 
 ##### Producers
-The producers show a similar pattern after we splid the multi producer into individual producer.
-We implement the same thing for producer.
-###### Split to individuals
+
+The producers show a similar pattern after we splid the multi producer into individual producer. We implement the same thing for producer. \###### Split to individuals
+
 ```{r}
 producer_long <- anime_data6 |>
   mutate(producer = str_split(producers, ",\\s*")) |>
   unnest(producer)
 
 ```
+
 ###### Count the average score for each producer
+
 ```{r}
 producer_stats <- producer_long |>
   group_by(producer) |>
@@ -444,7 +450,9 @@ producer_stats <- producer_long |>
   )
 
 ```
+
 ###### Filter the top producers
+
 ```{r}
 top_producers <- producer_stats |>
   filter(count >= 30, avg_score >= 7.03) |>
@@ -452,7 +460,9 @@ top_producers <- producer_stats |>
 
 print(top_producers)
 ```
+
 ###### Add column to classify producer as "top" or "other"
+
 ```{r}
 
 top_producer_list <- top_producers$producer
@@ -472,7 +482,9 @@ anime_data6$producer_rank <- factor(anime_data6$producer_rank, levels = c("Top",
 # delete producers column
 anime_data6 <- anime_data6 |> select(-producers)
 ```
+
 ###### Examin new dataset
+
 ```{r}
 anime_data6
 boxplot(score ~ studio_rank,
@@ -483,7 +495,9 @@ boxplot(score ~ studio_rank,
         col = c("lightblue", "lightgreen"))
 summary(anime_data6)
 ```
+
 #### Type Data Processing
+
 ```{r}
 anime_data7 <- anime_data6
 anime_data7$type_rank <- case_when(
@@ -496,7 +510,9 @@ anime_data7$type_rank <- case_when(
 anime_data7$type_rank <- factor(anime_data7$type_rank, levels = c("Low", "Mid", "High"))
 
 ```
+
 ##### Examing the new dataset
+
 ```{r}
 anime_data7
 boxplot(score ~ type_rank,
@@ -508,7 +524,9 @@ boxplot(score ~ type_rank,
 anime_data7 <- anime_data7 |> select(-type)
 summary(anime_data7)
 ```
+
 #### Rating Processing
+
 ```{r}
 anime_data8 <- anime_data7
 anime_data8$rating_rank <- case_when(
@@ -522,7 +540,9 @@ anime_data8$rating_rank <- factor(anime_data8$rating_rank, levels = c("Low", "Mi
 
 anime_data8 <- anime_data8 |> select(-rating)
 ```
+
 ##### Examing the new dataset
+
 ```{r}
 anime_data8
 boxplot(score ~ rating_rank,
@@ -533,8 +553,11 @@ boxplot(score ~ rating_rank,
         col = c("lightblue", "lightgreen","orange"))
 summary(anime_data8)
 ```
+
 #### Last data processing for predictive analysis
+
 anime_data9 will be the data we use for predictive anlyasis
+
 ```{r}
 anime_data9 <- anime_data8
 anime_data9 <- anime_data9 |> select(-mal_id)
@@ -542,7 +565,6 @@ anime_data9 <- anime_data9 |> select(-title)
 anime_data9$status <- as.factor(anime_data9$status)
 anime_data9
 ```
-
 
 ### Last
 

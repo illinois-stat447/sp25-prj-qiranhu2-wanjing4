@@ -69,7 +69,7 @@ Use the dataset "anime_data2" to find top 10 genre criteria of top 10 genre: ave
 ```
 
 ```{r}
-genre_counts <- anime_data |>
+genre_counts <- anime_data2 |>
   select(genres) |>
   mutate(genres = str_split(genres, ",\\s*")) |>  # split genres on comma
   unnest(genres) |>
@@ -82,7 +82,7 @@ genre_counts
 find top genre using avg score Based on the result, anime who has win the award has the higest avg score
 
 ```{r}
-top_genres <- anime_data |>
+top_genres <- anime_data5 |>
   select(score, genres) |>
   filter(!is.na(score), !is.na(genres)) |>
   mutate(genres = str_split(genres, ",\\s*")) |>
@@ -112,7 +112,7 @@ top10_genre <- c("Award, Winning", "Suspense", "Mystery", "Drama", "Romance",
 count the studios
 
 ```{r}
-studio_counts <- p_data |>
+studio_counts <- anime_data5 |>
   select(studios, score) |>
   unnest(studios) |>
   filter(!is.na(score)) |>
@@ -127,7 +127,7 @@ studio_counts
 ```
 
 ```{r}
-top_studio <- p_data |>
+top_studio <- anime_data5 |>
   select(score, studios) |>
   filter(!is.na(score), !is.na(studios)) |>
   unnest(studios) |>
@@ -144,7 +144,7 @@ top_studio
 For each count, analysis using boxplot on the distribution of anime produced in studios.
 
 ```{r}
-studios_counts <- as.numeric(table(unlist(p_data$studios)))
+studios_counts <- as.numeric(table(unlist(anime_data5$studios)))
 
 log_counts <- log1p(studios_counts)  # log(1 + x) to handle zeros
 hist(log_counts,
@@ -215,6 +215,7 @@ From the result, we see that Movie and TV had a significantly higher average sco
 *Based on the result, we add a new categorical column for predictive analysis. Detail is in Data preprocessing Rmd*
 
 #### Rating Analysis
+
 ```{r}
 anime_data7$type
 table(anime_data7$rating)
@@ -224,12 +225,14 @@ boxplot(score ~ rating,
         xlab = "Anime Rating",
         ylab = "Score",
         col = "lightblue",
-        las = 2)  # rotate x-axis labels for readability
+        las = 1,
+        cex.axis = 0.6)  # rotate x-axis labels for readability
 anime_data7 |>
   group_by(rating) |>
   summarise(avg_score = mean(score, na.rm = TRUE), .groups = "drop") |>
   arrange(desc(avg_score))
 ```
+
 #### Check difference between the ratings
 
 Because p value \< 0.05, there is significant difference in average score between some ratings
@@ -239,11 +242,12 @@ anova_result_rating <- aov(score ~ rating, data = anime_data7)
 summary(anova_result_rating)
 
 ```
+
 By implementing Tukey test, it shows which two ratings have average score that are significantly different.
 
 ```{r}
 TukeyHSD(anova_result_rating)
 
 ```
-From the report, we all other pairs have significantly differenct average score from each other except for PG - Children-G - All Ages and R+ - Mild Nudity-G - All Ages pairs.
-Based on the result and the boxplot above, the new column for rating was created in Data preprocessing Rmd.
+
+From the report, all other pairs have significantly differenct average score from each other except for PG - Children-G - All Ages and R+ - Mild Nudity-G - All Ages pairs. Based on the result and the boxplot above, the new column for rating was created in Data preprocessing Rmd.
