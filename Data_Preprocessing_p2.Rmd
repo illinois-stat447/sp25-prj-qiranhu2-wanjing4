@@ -1,6 +1,7 @@
 # Data Preprocessing for Predictive Model Part 2: Grouping and New Attributes
 
 ## Load libraries
+
 ```{r}
 library(dplyr)
 library(tidyr)
@@ -12,12 +13,11 @@ library(RSQLite)
 library(ggplot2)
 ```
 
-
 #### Studios data processing
 
 The data analysis for studios is in data_analysis.Rmd. We want to include the studios column when training the predictive model. Since the column has too many unique values, doint the one-hot encoding will result in a very high dimension of our dataset. We have considered to choose the top10 studios with higest 10 average score, but the output result shows studios with only 1 to 3 anime counts, which does not represent the studios' performance enough.
 
-Based on the analysis, some of the well-known/popular studios usually have a high count of anime with along with a high score. Therefore, we decide to choose studios that have anime count \>= 30 with a score \>= 7.03 (the top 25% of the score). 
+Based on the analysis, some of the well-known/popular studios usually have a high count of anime with along with a high score. Therefore, we decide to choose studios that have anime count \>= 30 with a score \>= 7.03 (the top 25% of the score).
 
 ##### find anime count for each studios
 
@@ -178,7 +178,6 @@ boxplot(score ~ rating_rank,
         col = c("lightblue", "lightgreen","orange"))
 ```
 
-
 #### One-hot Encoding for Genres
 
 ```{r}
@@ -207,8 +206,8 @@ summary(data_1hot)
 ```
 
 #### Last data processing for predictive analysis
-Remove mal_id and title. Then, change status to factor
-modified_data will be the data we use for predictive analysis
+
+Remove mal_id and title. Then, change status to factor modified_data will be the data we use for predictive analysis
 
 ```{r}
 modified_data <- data_1hot
