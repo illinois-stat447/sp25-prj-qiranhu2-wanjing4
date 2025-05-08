@@ -1,3 +1,0 @@
-"0","# load library here"
-"0","library(DBI)"
-"0","library(RSQLite)"

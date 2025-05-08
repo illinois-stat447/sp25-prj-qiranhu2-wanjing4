@@ -1,3 +1,0 @@
-"0","dbExecute(conn, ""ALTER TABLE anime_full ADD COLUMN genres TEXT;"")"
-"2","Error: duplicate column name: genres
-"

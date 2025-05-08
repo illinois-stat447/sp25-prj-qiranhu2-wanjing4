@@ -1,3 +1,0 @@
-"0","anime_data3 <- anime_data2[!is.na(anime_data2$producers),]"
-"0","anime_data4 <- anime_data3[!is.na(anime_data3$studios),]"
-"0","check_missing(anime_data4)"
