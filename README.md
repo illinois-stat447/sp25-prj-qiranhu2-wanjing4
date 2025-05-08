@@ -57,6 +57,8 @@ If you want to run our platform on your own computer, then you can follow the st
 
 Now, you are ready to launch the application. With the app.R file still open in RStudio, locate and click the run app button. It's usually a green triangle icon at the top of the source editor panel. By default, RStudio will show the app in a pop up window. You can also choose to open it in your external web browser by clicking the small drop down arrow next to Run App and selecting run external. Within a few seconds, you should see our application interface appear. Once the app is running, you can start using it interactively. The interface will be the same as the online version. You can navigate through the tabs, input search queries or parameters, and view various anime statistics and visualizations. When you finish exploring your favorite animes, you can simply close the app window or stop the Shiny app by clicking the red stop icon in RStudio's console panel. By following these instructions, you should be able to set up and run the Anime Statistics and Analysis Platform without any hassle. Thus, you can run the app anytime by just opening app.R in RStudio and clicking Run App because this process only needs to be done once.
 
+If you are using the default database or other large database after fetching through the API key, it may take a while to run certain features since the predictive models or the data visulizations take some time to process. But it will not take more than 1 or 2 minutes. 
+
 For more detailed analysis, you could explore the following Rmarkdown files to explore how we achieved each part of our project. 
 
 To run Rmarkdown files, run in this order:
