@@ -1,10 +1,12 @@
 ---
-title: "Peer Evaluation"
-author: "Qiran Hu"
+title: "Final Report"
 date: "May 6th, 2025"
-output: 
+output:
+  html_document:
+    toc: true
+    df_print: paged
   pdf_document:
-    toc: true         
+    toc: true
     number_sections: true
 ---
 
@@ -174,23 +176,11 @@ This section outlines how the data were collected via the Jikan API, the initial
 
 Our dataset was obtained by scripting the data from the Jikan API version 4.2.3, which is an open-source interface connected to the MyAnimeList database. By using this API, we retrieved approximately 28000 anime entries into a SQLite database based on their unique identifier mal_id. The genre attribute required special handling which was subsequently appended as a new column because it is in a separate API key. After carefully checking the dataset, we identified that 0.02% of anime titles were missing, which results in completely empty corresponding rows. These incomplete entries are then removed from the dataset. A comprehensive assessment of missing values across all categories was subsequently visualized using bar graphs.
 
-<p id="gdcalert1">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image1.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert2">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image1.png "image_tooltip")
+![](../AdditionalResources/1.png)
 
 For the purposes of our analysis, we selected a subset of attributes of mal_id, title, type, episodes, status, rating, score, scored_by, rank, popularity, members, favorites, genres, studios, and producers. Rather than implementing imputation strategies for missing values within these selected attributes, we decide to remove all the missing values. This approach is the best solution to deal with missing data since we only have a relatively small percentage of affected rows, which minimizes potential analytical impact. Additionally, we eliminated rows that do not have genre information through an inner join operation, which reduces our final dataset to approximately 18,000 entries.
 
-<p id="gdcalert2">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image2.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert3">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image2.png "image_tooltip")
+![](../AdditionalResources/3.png)
 
 In the final preprocessing phase, we reduced the categorical variables in the "genre" field to 30 classifications. The top 10 most popular genres were selected and transformed using one hot encoding, which is a technique that facilitates more efficient and effective model training in subsequent predictive analysis phases.
 
@@ -200,21 +190,7 @@ In the final preprocessing phase, we reduced the categorical variables in the "g
 
 In order to understand anime quality, we first examined the full distribution of anime scores within the dataset. Descriptive statistics revealed a minimum score of 1.88, with a first quartile at 5.78, median at 6.37, mean at approximately 6.40, third quartile at 7.04, and a maximum score of 9.30. The distribution indicated that most anime ratings clustered within a range of approximately 4 to 8, which demonstrates a relatively high overall quality perception among viewers. Additionally, by analyzing 102 outliers, we identified and quantified outliers to understand extremes in viewer perception. Among these outliers, a small subset displayed unusually low scores ranging from 2 to 4, which shows that there is significantly less viewer satisfaction or audience appeal compared to other high score outliers that are approaching the maximum rating.
 
-<p id="gdcalert3">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image3.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert4">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image3.png "image_tooltip")
-
-<p id="gdcalert4">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image4.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert5">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image4.png "image_tooltip")
+![](../AdditionalResources/4.png) ![](../AdditionalResources/5.png)
 
 |         |         |         |         |         |         |
 |---------|---------|---------|---------|---------|---------|
@@ -229,55 +205,23 @@ We explored anime studios by examining the number of anime produced by each stud
 
 Since the anime entries are categorized into nine distinct types such as TV series, Movies, Specials, and OVAs, we decide to perform an analysis of variance to statistically examine whether these anime types differed significantly in average viewer scores. The ANOVA test yielded a highly significant p value of 2e-16, which demonstrates meaningful differences in perceived anime quality across types.
 
-<p id="gdcalert5">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image5.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert6">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image5.png "image_tooltip")
-
-<p id="gdcalert6">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image6.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert7">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image6.png "image_tooltip")
+![](../AdditionalResources/6.png) ![](../AdditionalResources/7.png)
 
 We also decide to perform a Tukey post hoc to determine exactly which anime types differed significantly from each other. Our results indicated that anime categorized as Movie and TV types have notably higher average scores compared to others, which implies these formats consistently deliver higher quality content and better align with viewer expectations. Conversely, TV Special, Special, and ONA types are significantly different from other types with lower average scores, which indicates that these formats might face challenges in viewer appeal or content quality. Moreover, categories such as PV did not significantly differ in scores compared to types like CM, OVA, or Music on account of the fact that similar viewer expectations or perceptions across these formats. Furthermore, the type TV Special overlapped with multiple categories due to its intermediate performance and mixed viewer perception.
 
-<p id="gdcalert7">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image7.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert8">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image7.png "image_tooltip")
+![](../AdditionalResources/8.png)
 
 ## Distribution of Scores By Content Rating
 
 We conduct another analysis to examine average scores across anime content ratings. The ANOVA test also confirmed that there are statistically significant differences across categories. Further Tukey analysis detailed these differences, which reveals that almost all pairs of content rating groups have significantly distinct average scores since there are viewer differentiation based on content appropriateness and targeted audience segments. However, there are some exceptions between PG Children and G All Ages as well as between R Mild Nudity and G All Ages, which demonstrates that there are minimal perceived quality differences among these specific audience classifications. Hence, this suggests that content targeting broader audience groups or minimal age restrictions may share common viewer perceptions and quality expectations.
 
-<p id="gdcalert8">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image8.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert9">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image8.png "image_tooltip")
+![](../AdditionalResources/9.png)
 
 Explore Top Rated Anime Titles
 
 In order to understand the top rated anime titles, we sort the dataset by viewer scores to highlight the highest scoring anime. We realize that these five animes share some characteristics in common; each of them incorporates compelling narrative structures within popular and widely appealing genres such as action, adventure, drama, fantasy, science fiction, and suspense. Additionally, these titles often demonstrate a combination of high production quality, strong storytelling, and well developed characters, which are factors frequently associated with audience satisfaction. With unique storytelling and emotionally resonant themes, these factors significantly enhances audience appreciation, which makes them exemplary representations of successful mainstream anime.
 
-<p id="gdcalert9">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image9.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert10">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image9.png "image_tooltip")
+![](../AdditionalResources/10.png)
 
 ## Data Preprocessing For Predictive Analysis
 
@@ -297,13 +241,7 @@ In this section, we utilize our preprocessed dataset to predict anime scores on 
 
 Our analytical framework follows a systematic procedure for each model. We first initial model fitting and evaluate performance on training data through visualization of predicted versus actual scores. We then perform subsequent assessment on the testing data. For the linear regression model, both training and testing plots revealed a sigmoid shaped relationship between predicted and actual scores, which suggest its potential limitations in capturing non linear patterns in the data.
 
-<p id="gdcalert10">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image10.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert11">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image10.png "image_tooltip")
+![](../AdditionalResources/11.png) ![](../AdditionalResources/12.png)
 
 |       |             |             |
 |-------|-------------|-------------|
@@ -313,21 +251,7 @@ Our analytical framework follows a systematic procedure for each model. We first
 
 We also implement the random forest model by using the randomForest package in R. Within the train() function, we specified the number of trees ntree as 10 and set the importance parameter to TRUE to facilitate feature importance analysis.
 
-<p id="gdcalert11">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image11.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert12">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image11.png "image_tooltip")
-
-<p id="gdcalert12">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image12.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert13">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image12.png "image_tooltip")
+![](../AdditionalResources/13.png) ![](../AdditionalResources/14.png)
 
 |       |              |             |
 |-------|--------------|-------------|
@@ -339,19 +263,11 @@ After comparing these two models, we realize that the random forest algorithm de
 
 # Data Visualizations And Findings
 
-```         
 In order to answer the research questions that we are exploring earlier, we have constructed several data visualizations to help us better understand the relationship between different attributes in the dataset and their contribution to anime popularity.
-```
 
 ## Relationship between Anime Scores and Viewership
 
-<p id="gdcalert13">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image13.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert14">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image13.png "image_tooltip")
+![](../AdditionalResources/15.png)
 
 This scatterplot indicates the relationship between anime scores and number of viewers; it shows a moderate positive relationship between an anime’s score and its viewership as indicated by the correlation of 0.39. The scatterplot reveals a wide spread at the end as many anime with scores in the range between 7 to 9 have higher viewership. For instance, the most watched titles usually have solid scores around 7 or higher. There are also few instances showing highly popular with very low scores, which shows that extremely bad anime rarely becomes massively popular.
 
@@ -365,9 +281,7 @@ Some anime are highly rated by the viewers who watch them but they are not very 
 
 ### Why Do High Quality Series Remain Less Popular (Q1.3)
 
-```         
 There are several reasons why a high quality series might remain less known compared to other ones. Age and availability play a big role because many high quality series are older anime that aired before the anime boom or never got released internationally. For instance, Ashita no Joe 2 is over 40 years old already. Despite its classic status among veterans, newer generations have limited exposure to it. Older shows often suffer from outdated animation style or simply aren’t marketed on modern streaming platforms, which leads them to underperform in terms of attracting viewers. In other cases, minimal marketing or distribution issues can keep quality series obscure. As a result, having a high score is not enough to guarantee popularity. Without accessibility, broad appeal, or marketing, even top tier anime can remain relatively less known.
-```
 
 ### Common Characteristics Of Less Known High Quality Series (Q1.4 & Q1.5)
 
@@ -379,21 +293,9 @@ Conversely, there are anime that attract huge viewership despite having relative
 
 ## How Active Do Viewers Engage Based On Anime’s Popularity
 
-<p id="gdcalert14">
+![](../AdditionalResources/16.png) 
 
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image14.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert15">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image14.png "image_tooltip")
-
-<p id="gdcalert15">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image15.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert16">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image15.png "image_tooltip")
+![](../AdditionalResources/17.png)
 
 The graphs indicate a complex relationship between an anime’s popularity and how actively its viewers engage as measured by engagement activities. Viewers are most actively engaged through rating and favoriting when an anime resonates strongly with them, which is often correlated with the anime’s quality and its popularity. While popular anime gather a large number of engaged users, their engagement proportion may be affected by different viewers. On the other hand, anime with slightly smaller but passionate audiences can see disproportionately high engagement rates. As shown in the graphs, high score anime usually achieve high engagement ratios compared to average anime. Conversely, low score anime also achieve high engagement ratios due to fans complaining compared to average. In other words, anime popularity alone does not guarantee active discussion or feedback. Instead, the quality of an anime affects whether viewers engage very actively or not.
 
@@ -419,13 +321,7 @@ Based on our observation, there appears to be a strong positive correlation betw
 
 ## The Most Popular Genres Based On Scores And Views
 
-<p id="gdcalert16">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image16.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert17">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image16.png "image_tooltip")
+![](../AdditionalResources/18.png)
 
 By analyzing the radar chart, it becomes evident that certain genres have a distinctly stronger association with high viewership and widespread popularity. The radar chart distinctly illustrates that mystery, drama, and romance are the three most popular genres associated with their viewer ratings as indicated by their notably darker and longer shapes. These visual effects suggest that anime within these genres consistently receive high scores among viewers. The genre mystery shows the highest average score on the chart. Such consistent high ratings imply that the mystery genre successfully captures audience attention through compelling plot developments and stimulating narratives. Beyond identifying top performing genres, the radar chart provides detailed information about each genre and their appearance.
 
@@ -459,13 +355,7 @@ The growing recognition and prioritization of these genres by streaming platform
 
 ## The Correlation Between Top Tier Studios And High Score Anime
 
-<p id="gdcalert17">
-
-[\>\>\>\>\> gd2md-html alert: inline image link here (to images/image17.png). Store image on your image server and adjust path/filename/extension if necessary.]{style="color: red; font-weight: bold"}<br>(<a href="#">Back to top</a>)(<a href="#gdcalert18">Next alert</a>)<br>[\>\>\>\>\>]{style="color: red; font-weight: bold"}
-
-</p>
-
-![alt_text](images/image17.png "image_tooltip")
+![](../AdditionalResources/19.png)
 
 The chart provides valuable information for anime enthusiasts and the industry. For anime fans, knowing which studios consistently deliver quality can enhance their viewing experience because it is a guide to discovering anime that are likely to be enjoyable. The chart indicates some studios have been performing well historically, which is important for fan communities when discussing and recommending shows. For creators and studios, this analysis underlines the importance of maintaining a good track of record. A studio’s brand can influence its reception where a good reputation can create hype and initial goodwill for a show while a poor record might make viewers skeptical. For streaming platforms and publishers, recognizing these trends is equally important. Content from studios with high scores might be seen as high value IP; platforms may prioritize licensing shows from top tier studios knowing they are likely to attract viewership. Thus, the chart illustrates how studio identity, consistency, and reputation play a critical role in anime success. These insights are important to anime fans by guiding them toward quality content as well as creators and industry.
 
@@ -551,7 +441,6 @@ As one can see, the proposed future plans will transform our platform into a wel
 
 # Reference
 
-```         
 Bali, V. (2025, March 19). *The global anime market size was USD 28.8 billion in 2023!*. Cognitive Market Research. [https://www.cognitivemarketresearch.com/anime-market-report](https://www.cognitivemarketresearch.com/anime-market-report)
 
 
@@ -604,4 +493,4 @@ Wikimedia Foundation. (2025, April 22). Statistics. Wikipedia. [https://en.wikip
 
 
  Purini, R. (2024, July 3). Sony Group Portal - Crunchyroll’s mission to be the ultimate destination for anime fans. Sony Group Portal - Home. [https://www.sony.com/en/SonyInfo/blog/2024/07/03/](https://www.sony.com/en/SonyInfo/blog/2024/07/03/)
-```
+
